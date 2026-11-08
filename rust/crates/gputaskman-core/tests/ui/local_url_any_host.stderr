@@ -1,0 +1,7 @@
+error[E0451]: fields `port` and `path` of struct `LocalUrl` are private
+ --> tests/ui/local_url_any_host.rs:2:33
+  |
+2 | fn main() { let _u = LocalUrl { port: 80, path: String::new() }; }
+  |                                 ^^^^      ^^^^ private field
+  |                                 |
+  |                                 private field
