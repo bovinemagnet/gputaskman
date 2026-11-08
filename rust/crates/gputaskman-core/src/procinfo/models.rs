@@ -59,7 +59,7 @@ pub fn skip_path(path: &str) -> bool {
 
 /// Like Python's `os.path.abspath`: absolute against the current directory with `.` and `..`
 /// collapsed lexically. The filesystem is not consulted and symlinks are not resolved.
-fn abspath(path: &Path) -> Option<PathBuf> {
+pub(crate) fn abspath(path: &Path) -> Option<PathBuf> {
     let full = if path.is_absolute() {
         path.to_path_buf()
     } else {

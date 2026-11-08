@@ -2,6 +2,7 @@
 pub mod flags;
 pub mod logs;
 pub mod servers;
+pub mod view;
 
 pub(crate) const MIB: u64 = 1 << 20;
 
