@@ -1,0 +1,14 @@
+[workspace]
+resolver = "3"
+members = ["crates/gputaskman-core", "crates/gputaskman-linux", "crates/gputaskman"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+authors = ["Paul Snow"]
+license = "MIT"
+rust-version = "1.97"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

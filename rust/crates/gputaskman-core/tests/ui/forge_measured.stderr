@@ -1,0 +1,11 @@
+error[E0423]: cannot initialize a tuple struct which contains private fields
+ --> tests/ui/forge_measured.rs:2:22
+  |
+2 | fn main() { let _m = Measured(5); }
+  |                      ^^^^^^^^
+  |
+note: constructor is not visible here due to private fields
+ --> src/provenance.rs
+  |
+  | pub struct Measured(u64);
+  |                     ^^^ private field

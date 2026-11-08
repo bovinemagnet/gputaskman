@@ -1,0 +1,14 @@
+[package]
+name = "gputaskman-linux"
+description = "Linux backends for gputaskman (NVML, amdgpu DRM, /proc)"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+gputaskman-core = { path = "../gputaskman-core" }
+
+[lints]
+workspace = true

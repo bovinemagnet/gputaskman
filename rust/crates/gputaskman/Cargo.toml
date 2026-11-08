@@ -1,0 +1,17 @@
+[package]
+name = "gputaskman"
+description = "An htop for what's inside your GPU"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+gputaskman-core = { path = "../gputaskman-core" }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+gputaskman-linux = { path = "../gputaskman-linux" }
+
+[lints]
+workspace = true
