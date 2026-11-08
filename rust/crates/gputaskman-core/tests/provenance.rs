@@ -5,9 +5,18 @@ use gputaskman_core::provenance::*;
 fn only_measured_bytes_reach_the_total() {
     let rows = [
         Bytes::measured(3),
-        Bytes::Inferred { bytes: 100, by: Confidence::Consistent },
-        Bytes::Estimated { bytes: 100, from: EstimateSource::Gguf },
-        Bytes::Reported { bytes: 100, by: Reporter::LoadLog },
+        Bytes::Inferred {
+            bytes: 100,
+            by: Confidence::Consistent,
+        },
+        Bytes::Estimated {
+            bytes: 100,
+            from: EstimateSource::Gguf,
+        },
+        Bytes::Reported {
+            bytes: 100,
+            by: Reporter::LoadLog,
+        },
         Bytes::measured(0),
         Bytes::measured(4),
     ];
@@ -32,10 +41,31 @@ fn measured_zero_is_not_unknown() {
 fn serialises_with_status_tag() {
     let cases = [
         (Bytes::measured(5), r#"{"status":"measured","bytes":5}"#),
-        (Bytes::Inferred { bytes: 5, by: Confidence::Order }, r#"{"status":"inferred","bytes":5,"by":"order"}"#),
-        (Bytes::Estimated { bytes: 5, from: EstimateSource::Gguf }, r#"{"status":"estimated","bytes":5,"from":"gguf"}"#),
-        (Bytes::Reported { bytes: 5, by: Reporter::LoadLog }, r#"{"status":"reported","bytes":5,"by":"load_log"}"#),
-        (Bytes::unavailable(Reason::SharedClient), r#"{"status":"unavailable","reason":"shared_client"}"#),
+        (
+            Bytes::Inferred {
+                bytes: 5,
+                by: Confidence::Order,
+            },
+            r#"{"status":"inferred","bytes":5,"by":"order"}"#,
+        ),
+        (
+            Bytes::Estimated {
+                bytes: 5,
+                from: EstimateSource::Gguf,
+            },
+            r#"{"status":"estimated","bytes":5,"from":"gguf"}"#,
+        ),
+        (
+            Bytes::Reported {
+                bytes: 5,
+                by: Reporter::LoadLog,
+            },
+            r#"{"status":"reported","bytes":5,"by":"load_log"}"#,
+        ),
+        (
+            Bytes::unavailable(Reason::SharedClient),
+            r#"{"status":"unavailable","reason":"shared_client"}"#,
+        ),
     ];
     for (value, json) in cases {
         assert_eq!(serde_json::to_string(&value).unwrap(), json);
@@ -46,10 +76,14 @@ fn serialises_with_status_tag() {
 #[test]
 fn reason_codes_match_python() {
     let codes = [
-        (Reason::Legacy, "legacy"), (Reason::SharedClient, "shared_client"),
-        (Reason::SharedBuffers, "shared_buffers"), (Reason::Primary, "primary"),
-        (Reason::Incomplete, "incomplete"), (Reason::PartialScan, "partial_scan"),
-        (Reason::NvmlHidden, "nvml_hidden"), (Reason::V1Unknown, "v1_unknown"),
+        (Reason::Legacy, "legacy"),
+        (Reason::SharedClient, "shared_client"),
+        (Reason::SharedBuffers, "shared_buffers"),
+        (Reason::Primary, "primary"),
+        (Reason::Incomplete, "incomplete"),
+        (Reason::PartialScan, "partial_scan"),
+        (Reason::NvmlHidden, "nvml_hidden"),
+        (Reason::V1Unknown, "v1_unknown"),
     ];
     for (reason, code) in codes {
         assert_eq!(reason.code(), code);

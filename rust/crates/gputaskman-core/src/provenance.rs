@@ -86,12 +86,25 @@ impl Reason {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "status", rename_all = "snake_case")]
 pub enum Bytes {
-    Measured { bytes: u64 },
+    Measured {
+        bytes: u64,
+    },
     /// Exact size, inferred owner, already counted under another row: never summed.
-    Inferred { bytes: u64, by: Confidence },
-    Estimated { bytes: u64, from: EstimateSource },
-    Reported { bytes: u64, by: Reporter },
-    Unavailable { reason: Reason },
+    Inferred {
+        bytes: u64,
+        by: Confidence,
+    },
+    Estimated {
+        bytes: u64,
+        from: EstimateSource,
+    },
+    Reported {
+        bytes: u64,
+        by: Reporter,
+    },
+    Unavailable {
+        reason: Reason,
+    },
 }
 
 impl Bytes {
@@ -158,8 +171,6 @@ impl MeasuredTotal {
 pub struct Shown(u64);
 
 impl Shown {
-    // Constructed by the platform producers from Task 2 onwards.
-    #[allow(dead_code)]
     pub(crate) fn new(bytes: u64) -> Self {
         Self(bytes)
     }
