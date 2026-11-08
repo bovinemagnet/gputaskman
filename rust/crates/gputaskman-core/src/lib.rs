@@ -2,6 +2,7 @@
 pub mod env;
 pub mod gguf;
 pub mod http;
+pub mod llm;
 pub mod model;
 pub mod procinfo;
 pub mod provenance;
