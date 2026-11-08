@@ -11,8 +11,11 @@ use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 const ARRAY_INLINE_LIMIT: u64 = 4096;
+/// Deliberate divergence from Python: cap array nesting so a hostile file cannot recurse without
+/// bound (Python relies on its interpreter recursion limit).
 const MAX_DEPTH: u32 = 16;
-/// Python reports short reads as `EOFError`, including a bad length that runs past the end.
+/// Python's text for a short read. Over-long lengths also use it here, which is a deliberate
+/// divergence: Python fails differently (or later), but we reject eagerly to bound allocation.
 const TRUNCATED: &str = "EOFError: truncated GGUF header";
 const CACHE_ENTRIES: usize = 64;
 
@@ -337,7 +340,8 @@ impl Reader {
     }
 
     /// A length that must fit in what is left of the file, so corrupt headers cannot
-    /// trigger large allocations.
+    /// trigger large allocations. Deliberately stricter than Python, which reads short and
+    /// fails later (or raises `OverflowError` for huge values).
     fn bounded(&mut self, bytes_per_item: u64) -> Res<u64> {
         let n = self.length()?;
         match n.checked_mul(bytes_per_item) {

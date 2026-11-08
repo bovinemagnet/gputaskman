@@ -103,6 +103,7 @@ fn not_gguf() {
     assert!(GgufCache::new().read(&dir.path().join("missing")).is_none());
 }
 
+// The asserted text is this reader's own; Python's differs and is interpreter-dependent.
 #[test]
 fn corrupt_lengths_do_not_allocate() {
     let dir = tempfile::tempdir().unwrap();
