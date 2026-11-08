@@ -22,3 +22,4 @@ ureq = "3.5.1"
 [dev-dependencies]
 trybuild = "1.0.122"
 gputaskman-core = { path = ".", features = ["test-support"] }
+tempfile = "3.27.0"

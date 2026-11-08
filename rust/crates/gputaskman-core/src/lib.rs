@@ -1,5 +1,6 @@
 //! Platform-neutral core of gputaskman.
 pub mod env;
+pub mod gguf;
 pub mod http;
 pub mod model;
 pub mod provenance;
