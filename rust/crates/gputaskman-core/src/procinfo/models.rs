@@ -1,5 +1,5 @@
 //! Model-file rules: which mapped or named files count as models (`procinfo.py`).
-use std::path::Path;
+use std::path::{Component, Path, PathBuf};
 
 use crate::env::Paths;
 use crate::gguf::GgufCache;
@@ -57,6 +57,27 @@ pub fn skip_path(path: &str) -> bool {
             || MAC_SKIP_PARTS.iter().any(|p| path.contains(p)))
 }
 
+/// Like Python's `os.path.abspath`: absolute against the current directory with `.` and `..`
+/// collapsed lexically. The filesystem is not consulted and symlinks are not resolved.
+fn abspath(path: &Path) -> Option<PathBuf> {
+    let full = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        std::env::current_dir().ok()?.join(path)
+    };
+    let mut out = PathBuf::new();
+    for part in full.components() {
+        match part {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                out.pop();
+            }
+            other => out.push(other.as_os_str()),
+        }
+    }
+    Some(out)
+}
+
 /// Existing files named by model flags on the command line, as absolute paths.
 #[must_use]
 pub fn models_from_cmdline(cmd: &[String]) -> Vec<String> {
@@ -85,7 +106,7 @@ pub fn models_from_cmdline(cmd: &[String]) -> Vec<String> {
             None => cmd.get(i + 1).map(String::as_str),
         };
         if let Some(v) = val.filter(|v| !v.is_empty() && Path::new(v).is_file())
-            && let Ok(abs) = std::path::absolute(v)
+            && let Some(abs) = abspath(Path::new(v))
         {
             paths.push(abs.to_string_lossy().into_owned());
         }

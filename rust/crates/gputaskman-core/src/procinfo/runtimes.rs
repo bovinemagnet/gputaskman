@@ -89,7 +89,7 @@ static COMPILED: LazyLock<Compiled> = LazyLock::new(|| {
 });
 
 /// Extension as `os.path.splitext` sees it: from the last dot, ignoring leading dots.
-fn splitext(base: &str) -> &str {
+pub(crate) fn splitext(base: &str) -> &str {
     match base.rfind('.') {
         Some(i) if base[..i].chars().any(|c| c != '.') => &base[i..],
         _ => "",
