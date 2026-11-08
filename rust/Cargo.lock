@@ -139,6 +139,7 @@ dependencies = [
 name = "gputaskman-core"
 version = "0.0.0"
 dependencies = [
+ "glob",
  "gputaskman-core",
  "regex",
  "serde",

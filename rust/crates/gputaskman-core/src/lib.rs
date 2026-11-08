@@ -3,6 +3,7 @@ pub mod env;
 pub mod gguf;
 pub mod http;
 pub mod model;
+pub mod procinfo;
 pub mod provenance;
 pub mod stores;
 #[cfg(any(test, feature = "test-support"))]
