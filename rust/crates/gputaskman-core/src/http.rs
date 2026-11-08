@@ -13,6 +13,7 @@ impl Default for UreqGet {
         let config = ureq::Agent::config_builder()
             .proxy(None)
             .http_status_as_error(false)
+            .max_redirects(0)
             .build();
         Self {
             agent: config.into(),

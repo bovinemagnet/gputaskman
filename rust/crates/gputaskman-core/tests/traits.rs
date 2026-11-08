@@ -83,3 +83,44 @@ fn ureq_get_is_a_get_and_only_accepts_200() {
     );
     server.join().unwrap();
 }
+
+#[test]
+fn loopback_path_cannot_change_the_host() {
+    assert_eq!(
+        LocalUrl::loopback(80, "@evil.com/").to_string(),
+        "http://127.0.0.1:80/@evil.com/"
+    );
+    assert_eq!(
+        LocalUrl::loopback(80, "/ok").to_string(),
+        "http://127.0.0.1:80/ok"
+    );
+}
+
+#[test]
+fn ureq_get_does_not_follow_redirects() {
+    // The redirect target is a second loopback listener, so a followed redirect is observable.
+    let target = TcpListener::bind("127.0.0.1:0").unwrap();
+    target.set_nonblocking(true).unwrap();
+    let target_port = target.local_addr().unwrap().port();
+    let first = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = first.local_addr().unwrap().port();
+    let server = std::thread::spawn(move || {
+        let (mut stream, _) = first.accept().unwrap();
+        let mut buf = [0u8; 2048];
+        let _ = stream.read(&mut buf).unwrap();
+        let response = format!(
+            "HTTP/1.1 302 Found\r\nLocation: http://127.0.0.1:{target_port}/\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+        );
+        stream.write_all(response.as_bytes()).unwrap();
+    });
+    assert_eq!(
+        UreqGet::default().get(&LocalUrl::loopback(port, "/r"), Duration::from_millis(500)),
+        None
+    );
+    server.join().unwrap();
+    std::thread::sleep(Duration::from_millis(100));
+    assert!(
+        target.accept().is_err(),
+        "the redirect target was contacted"
+    );
+}

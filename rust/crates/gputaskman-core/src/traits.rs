@@ -66,10 +66,13 @@ pub struct LocalUrl {
 
 impl LocalUrl {
     pub fn loopback(port: u16, path: &str) -> Self {
-        Self {
-            port,
-            path: path.to_string(),
-        }
+        // Anchor the path so it can never turn into userinfo and change the host.
+        let path = if path.starts_with('/') {
+            path.to_string()
+        } else {
+            format!("/{path}")
+        };
+        Self { port, path }
     }
 
     pub fn base(&self) -> String {
