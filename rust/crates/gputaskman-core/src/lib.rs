@@ -4,6 +4,7 @@ pub mod gguf;
 pub mod http;
 pub mod model;
 pub mod provenance;
+pub mod stores;
 #[cfg(any(test, feature = "test-support"))]
 pub mod testing;
 pub mod traits;
