@@ -6,12 +6,14 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs::File;
-use std::io::{BufReader, Read, Seek, SeekFrom};
+use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 const ARRAY_INLINE_LIMIT: u64 = 4096;
 const MAX_DEPTH: u32 = 16;
+/// Python reports short reads as `EOFError`, including a bad length that runs past the end.
+const TRUNCATED: &str = "EOFError: truncated GGUF header";
 const CACHE_ENTRIES: usize = 64;
 
 /// A GGUF metadata value. Unsigned integers map to `U`, signed to `I`, floats to `F`.
@@ -295,8 +297,8 @@ pub fn is_gguf(path: &Path) -> bool {
         && &magic == b"GGUF"
 }
 
-struct Reader<R> {
-    r: R,
+struct Reader {
+    r: BufReader<File>,
     version: u32,
     pos: u64,
     size: u64,
@@ -304,7 +306,7 @@ struct Reader<R> {
 
 type Res<T> = Result<T, String>;
 
-impl<R: Read + Seek> Reader<R> {
+impl Reader {
     fn remaining(&self) -> u64 {
         self.size.saturating_sub(self.pos)
     }
@@ -313,7 +315,7 @@ impl<R: Read + Seek> Reader<R> {
         let mut buf = [0u8; N];
         self.r
             .read_exact(&mut buf)
-            .map_err(|_| "truncated GGUF header".to_string())?;
+            .map_err(|_| TRUNCATED.to_string())?;
         self.pos += N as u64;
         Ok(buf)
     }
@@ -340,15 +342,16 @@ impl<R: Read + Seek> Reader<R> {
         let n = self.length()?;
         match n.checked_mul(bytes_per_item) {
             Some(total) if total <= self.remaining() => Ok(n),
-            _ => Err("truncated GGUF header".into()),
+            _ => Err(TRUNCATED.into()),
         }
     }
 
     fn skip(&mut self, n: u64) -> Res<()> {
-        let off = i64::try_from(n).map_err(|_| "truncated GGUF header".to_string())?;
+        let off = i64::try_from(n).map_err(|_| TRUNCATED.to_string())?;
+        // seek_relative keeps the read buffer when the target is inside it.
         self.r
-            .seek(SeekFrom::Current(off))
-            .map_err(|e| e.to_string())?;
+            .seek_relative(off)
+            .map_err(|e| format!("OSError: {e}"))?;
         self.pos += n;
         Ok(())
     }
@@ -358,7 +361,7 @@ impl<R: Read + Seek> Reader<R> {
         let mut buf = vec![0u8; n as usize];
         self.r
             .read_exact(&mut buf)
-            .map_err(|_| "truncated GGUF header".to_string())?;
+            .map_err(|_| TRUNCATED.to_string())?;
         self.pos += n;
         Ok(String::from_utf8_lossy(&buf).into_owned())
     }
@@ -393,7 +396,7 @@ impl<R: Read + Seek> Reader<R> {
             8 => self.string().map(MetaValue::Str),
             9 => {
                 if depth >= MAX_DEPTH {
-                    return Err("GGUF arrays nested too deeply".into());
+                    return Err("RecursionError: maximum recursion depth exceeded".into());
                 }
                 let etype = self.u32()?;
                 if let Some(size) = scalar_size(etype) {
@@ -421,7 +424,7 @@ impl<R: Read + Seek> Reader<R> {
                 }
                 Ok(MetaValue::Str(format!("<array[{n}]>")))
             }
-            _ => Err(format!("unknown GGUF value type {vtype}")),
+            _ => Err(format!("ValueError: unknown GGUF value type {vtype}")),
         }
     }
 }
@@ -459,7 +462,7 @@ fn parse(path: &Path, size: u64) -> GgufInfo {
         error: None,
     };
     let Ok(file) = File::open(path) else {
-        info.error = Some("cannot open file".into());
+        info.error = Some("OSError: cannot open file".into());
         return info;
     };
     let mut r = Reader {
@@ -478,16 +481,18 @@ fn parse(path: &Path, size: u64) -> GgufInfo {
 /// Returns the sorted tensor table as (offset, name, element count), plus the data start offset.
 type Tensors = (Vec<(u64, String, u64)>, u64);
 
-fn read_header<R: Read + Seek>(r: &mut Reader<R>, info: &mut GgufInfo) -> Res<Tensors> {
-    if r.bytes::<4>()? != *b"GGUF" {
+fn read_header(r: &mut Reader, info: &mut GgufInfo) -> Res<Tensors> {
+    if r.bytes::<4>().ok() != Some(*b"GGUF") {
         return Err("not a GGUF file".into());
     }
-    info.version = r.u32()?;
+    info.version = r
+        .u32()
+        .map_err(|_| "error: unpack requires a buffer of 4 bytes".to_string())?;
     r.version = info.version;
     let n_tensors = r.length()?;
     let n_kv = r.length()?;
     if n_tensors > r.remaining() || n_kv > r.remaining() {
-        return Err("truncated GGUF header".into());
+        return Err(TRUNCATED.into());
     }
     for _ in 0..n_kv {
         let key = r.string()?;
@@ -500,7 +505,7 @@ fn read_header<R: Read + Seek>(r: &mut Reader<R>, info: &mut GgufInfo) -> Res<Te
         let name = r.string()?;
         let n_dims = r.u32()?;
         if u64::from(n_dims) > r.remaining() {
-            return Err("truncated GGUF header".into());
+            return Err(TRUNCATED.into());
         }
         let mut n = 1u64;
         for _ in 0..n_dims {
@@ -515,7 +520,7 @@ fn read_header<R: Read + Seek>(r: &mut Reader<R>, info: &mut GgufInfo) -> Res<Te
         Some(v) => v
             .as_u64()
             .filter(|a| *a != 0)
-            .ok_or("invalid general.alignment")?,
+            .ok_or("ZeroDivisionError: integer division or modulo by zero")?,
     };
     let data_start = r.pos.div_ceil(align).saturating_mul(align);
     tensors.sort();

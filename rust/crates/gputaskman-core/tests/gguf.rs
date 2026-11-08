@@ -45,7 +45,10 @@ fn truncated_model_reports_error() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("truncated.gguf");
     std::fs::write(&path, b"GGUF").unwrap();
-    assert!(GgufCache::new().read(&path).unwrap().error.is_some());
+    assert_eq!(
+        GgufCache::new().read(&path).unwrap().error.as_deref(),
+        Some("error: unpack requires a buffer of 4 bytes")
+    );
     assert!(is_gguf(&path));
 }
 
@@ -110,7 +113,53 @@ fn corrupt_lengths_do_not_allocate() {
     b.extend(1u64.to_le_bytes());
     b.extend(u64::MAX.to_le_bytes()); // key length
     std::fs::write(&path, b).unwrap();
-    assert!(GgufCache::new().read(&path).unwrap().error.is_some());
+    assert_eq!(
+        GgufCache::new().read(&path).unwrap().error.as_deref(),
+        Some("EOFError: truncated GGUF header")
+    );
+}
+
+#[test]
+fn unknown_value_type_error_matches_python() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("bad.gguf");
+    let mut b = b"GGUF".to_vec();
+    b.extend(3u32.to_le_bytes());
+    b.extend(0u64.to_le_bytes());
+    b.extend(1u64.to_le_bytes());
+    b.extend(1u64.to_le_bytes());
+    b.push(b'k');
+    b.extend(99u32.to_le_bytes());
+    std::fs::write(&path, b).unwrap();
+    assert_eq!(
+        GgufCache::new().read(&path).unwrap().error.as_deref(),
+        Some("ValueError: unknown GGUF value type 99")
+    );
+}
+
+#[test]
+fn large_string_array_is_skipped_correctly() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("big.gguf");
+    write_gguf(
+        &path,
+        &[
+            ("general.architecture", V::Str("llama")),
+            ("tokenizer.ggml.tokens", V::StrArray(50_000)),
+            ("llama.block_count", V::U32(1)),
+            ("general.name", V::Str("After")),
+        ],
+        &[("blk.0.w", &[4, 4], 0), ("output.weight", &[4], 0)],
+    );
+    let g = GgufCache::new().read(&path).unwrap();
+    assert_eq!(g.error, None);
+    assert_eq!(g.name(), "After");
+    assert_eq!(g.n_layers(), 1);
+    assert_eq!(
+        g.metadata.get("tokenizer.ggml.tokens"),
+        Some(&MetaValue::Str("<string[50000]>".into()))
+    );
+    assert_eq!(g.layer_bytes.get(&0), Some(&64));
 }
 
 fn header(arch: &str, extra: &[(&str, V)], dir: &std::path::Path) -> GgufInfo {
@@ -128,6 +177,7 @@ fn header(arch: &str, extra: &[(&str, V)], dir: &std::path::Path) -> GgufInfo {
                 V::U32(n) => V::U32(*n),
                 V::Bool(b) => V::Bool(*b),
                 V::Str(s) => V::Str(s),
+                V::StrArray(n) => V::StrArray(*n),
             },
         ));
     }
@@ -140,6 +190,7 @@ fn header(arch: &str, extra: &[(&str, V)], dir: &std::path::Path) -> GgufInfo {
                     V::U32(n) => V::U32(*n),
                     V::Bool(b) => V::Bool(*b),
                     V::Str(s) => V::Str(s),
+                    V::StrArray(n) => V::StrArray(*n),
                 },
             )
         })
