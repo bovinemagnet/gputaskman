@@ -29,8 +29,8 @@ WSL (host counter stream and context matching), Windows (WDDM/PDH/DXGI, ADL, AMD
 
 1. `cargo test --workspace` passes on Ubuntu, Windows and macOS (core crate everywhere; Linux crate
    on Ubuntu only), with `cargo clippy --workspace -- -D warnings` clean.
-2. Parity tests pass: on every shared fixture, Python's `--json` output, loaded through the Rust v1
-   reader, equals the Rust collector's v2 snapshot (ignoring `taken`).
+2. Parity tests pass (section 8): backend results match on every shared fixture, and Python's
+   `to_dict` output, loaded through the Rust v1 reader, equals the Rust v2 snapshot (ignoring `taken`).
 3. A compile-fail test proves an inferred, estimated or reported byte count cannot be added to the
    measured attribution total.
 4. Every provenance rule in `AGENTS.md` maps to a named test (section 8).
@@ -55,8 +55,11 @@ tests on every platform. Later backends (`gputaskman-wsl`, `gputaskman-windows`,
 and the TUI (`gputaskman-tui`) are added as crates implementing the same traits.
 
 **Dependencies:** `serde`, `serde_json`, `clap` (derive), `nvml-wrapper` (dynamic loading of the
-installed `libnvidia-ml.so`; never bundled), `procfs` (with an injectable root), `ureq` (blocking
-HTTP, `GET` only), `thiserror`. Dev: `trybuild`, `tempfile`. No async runtime.
+installed `libnvidia-ml.so`; never bundled), `ureq` (blocking
+HTTP, `GET` only), `thiserror`, `libc` (Linux crate: `sysconf(_SC_CLK_TCK)`). `/proc` and `/sys` are
+read with `std::fs` from an injectable root (the fallback allowed in section 10, chosen up front so
+tests build trees the same way the Python tests do). Dev: `trybuild`, `tempfile`, `assert_cmd`. No
+async runtime.
 
 ## 3. Core types and provenance
 
@@ -67,7 +70,8 @@ possible, rather than by convention.
 /// A byte quantity and how it is known. Unknown is never zero.
 pub enum Bytes {
     Measured(u64),
-    Inferred { bytes: u64, by: Confidence },      // exact size, inferred owner
+    Inferred { bytes: u64, by: Confidence },      // exact size, inferred owner, already counted
+                                                    // under another row (the WSL VM): never summed
     Estimated { bytes: u64, from: EstimateSource }, // computed (GGUF maths)
     Reported { bytes: u64, by: Reporter },          // a runtime said so (API, load log)
     Unavailable(Reason),
@@ -76,7 +80,14 @@ pub enum Confidence { Consistent, Order }          // renders "*" and "?"
 ```
 
 - `Snapshot::attributed() -> Option<u64>` sums only `Bytes::Measured`. It returns `None` when any
-  row's VRAM is `Unavailable` (as Python's `Snapshot.attributed` checks every row). The sum is built through a `MeasuredTotal` accumulator whose
+  row's VRAM is `Unavailable` with a reason whose `voids_attribution()` is true. That is every reason
+  except `nvml_hidden`: Python counts an NVML row with hidden memory as 0 in the total (it is part of
+  the unattributed remainder) but voids the total for DRM's unattributed rows, and the port keeps
+  that behaviour.
+- A row whose bytes are measured but whose owner is inferred (a container matching NVML's host PIDs
+  to local PIDs) has `vram: Measured` plus `owner: Some(Confidence)`. It is summed, as in Python,
+  because no other row holds those bytes. `Bytes::Inferred` is only for bytes another row already
+  holds. The sum is built through a `MeasuredTotal` accumulator whose
   only `add` method takes a `Measured` newtype, so adding any other variant does not compile.
 - `ProcGpu::shown_vram()` returns `Measured` or `Inferred` bytes for display, sorting and scan
   priority only. It returns a `Shown` newtype that has no conversion into `MeasuredTotal`.
@@ -88,7 +99,8 @@ pub enum Confidence { Consistent, Order }          // renders "*" and "?"
   hints (`kind_hint`) are a separate field that the KV and weight maths never reads.
 - `Reason` is a closed enum of stable string codes. The DRM codes reuse Python's values: `legacy`,
   `shared_client`, `shared_buffers`, `primary`, `incomplete`, `partial_scan`. New codes include
-  `nvml_not_loaded`, `process_unreadable`, `not_on_backend`, `outside_namespace` and `v1_unknown`.
+  `nvml_not_loaded`, `nvml_hidden`, `process_unreadable`, `not_on_backend`, `outside_namespace`,
+  `kfd_untimed`, `no_baseline`, `torn_counter` and `v1_unknown`.
 
 Other core types mirror the Python data model: `Adapter` (keyed by PCI bus ID on Linux, never name
 or index), `DeviceTelemetry` (every reading `Option`), `ProcRow`, `ProcDetail`, `MappedModel`,
@@ -152,7 +164,7 @@ its engine baseline at construction.
    (`shared_is_spill == false`), GTT counts as held memory. Handy executables get `inspect_handy`.
 6. **Prune** per-PID caches for processes that have gone.
 
-GGUF headers and store manifests are cached by `(path, size, mtime)`. `procfs` reads are bounded
+GGUF headers and store manifests are cached by `(path, size, mtime)`. `/proc` reads are bounded
 the same way Python's are; there is no equivalent of `psutil.open_files()` (rule 7). The DRM fd walk
 honours the same budget and reports `partial_scan` when it is cut short.
 
@@ -189,7 +201,7 @@ A process:
 ```json
 {
   "pid": 4242, "origin": "local", "name": "llama-server", "kind": "LLM", "runtimes": ["CUDA"],
-  "vram":      {"status": "measured", "bytes": 3221225472},
+  "vram":      {"status": "measured", "bytes": 3221225472}, "owner_inferred_by": null,
   "shared":    {"status": "measured", "bytes": 0},
   "committed": {"status": "unavailable", "reason": "not_on_backend"},
   "paged_out": {"status": "unavailable", "reason": "not_on_backend"},
@@ -233,7 +245,7 @@ Rules:
 
 | v1 field(s) | v2 |
 |---|---|
-| `vram_bytes` non-null | `vram: measured` |
+| `vram_bytes` non-null | `vram: measured`; `owner_inferred_by` from `vram_inferred_by` |
 | else `vram_inferred_bytes` non-null | `vram: inferred`, `by` from `vram_inferred_by` |
 | else | `vram: unavailable`, reason from `vram_unattributed_reason`, else `v1_unknown` |
 | `shared_bytes`, `committed_bytes`, `paged_out_bytes` | `measured` if non-null, else `unavailable(v1_unknown)` |
@@ -272,10 +284,14 @@ TDD throughout: each Python test case is ported first as a failing Rust test, th
    tests build (regenerated by a small script from the Python test helpers, so both suites use the
    same data), GGUF header samples, llama.cpp and Ollama load logs, server API responses, and
    saved v1 snapshots.
-3. **Parity tests** (`cargo test --features parity`, needs `uv`): a Python harness runs the Python
-   collector against each fixture with NVML mocked the same way as the Rust `NvmlBackend` mock, and
-   writes v1 JSON. The Rust test loads it through the v1 reader and requires equality with the Rust
-   collector's snapshot, ignoring `taken`.
+3. **Parity tests** (`cargo test --features parity`, needs `uv`), at two levels. *Backend parity:*
+   scenario files in `rust/tests/fixtures/parity/` describe DRM cards, process fds and fdinfo, and
+   fake NVML data; a Python harness builds the tree, runs `DrmCounters`/`LinuxCounters` with the
+   Python test fakes, and prints per-process results, which must equal the Rust backends' results on
+   the same tree. *Report parity:* the same scenario snapshots go through Python's `to_dict`, then the
+   Rust v1 reader, and must equal the Rust v2 snapshot, ignoring `taken`. The whole Python collector
+   is not run, because it reads the live `/proc` through psutil; the collector's logic is covered by
+   the ported unit tests.
 4. **Compile-fail tests** (`trybuild`): adding an `Inferred`, `Estimated`, `Reported` or `Shown`
    value to `MeasuredTotal`; adding two `Resident` values; building a `LocalUrl` for a non-loopback
    host.
@@ -300,8 +316,9 @@ backend can be validated live during milestone 1. `rust/README.md` labels every 
 
 ## 10. Risks
 
-- **`procfs` crate coverage:** if its fdinfo or socket parsing cannot read a fixture exactly as the
-  Python code does, that piece falls back to direct `std::fs` reads from the same injectable root.
+- **Hand-written `/proc` parsing:** `std::fs` is used instead of the `procfs` crate, so the parsers
+  for `stat`, `smaps`, `net/tcp{,6}` and fd links are our own. Each has fixture tests taken from real
+  kernel output.
 - **`nvml-wrapper` mocking:** NVML sits behind a small internal `NvmlApi` trait so tests never load
   the real library.
 - **Parity harness drift:** the Python harness imports the Python modules directly; if their
