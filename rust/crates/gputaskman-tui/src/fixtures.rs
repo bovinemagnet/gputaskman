@@ -164,3 +164,46 @@ pub fn style_of(lines: &[Line<'_>], needle: &str) -> Option<Style> {
             .map(|s| l.style.patch(s.style))
     })
 }
+
+use ratatui::{Terminal, backend::TestBackend};
+
+use crate::app::App;
+
+/// Draws `app` once at `width`×`height` and stores the hit areas, as the event loop does.
+pub fn render(app: &mut App, width: u16, height: u16) -> Terminal<TestBackend> {
+    let mut terminal = Terminal::new(TestBackend::new(width, height)).expect("test terminal");
+    let mut areas = app.areas;
+    {
+        let view: &App = app;
+        terminal
+            .draw(|f| areas = crate::view::draw(view, f))
+            .expect("draw");
+    }
+    app.areas = areas;
+    terminal
+}
+
+/// The screen's text, one line per row.
+pub fn screen(t: &Terminal<TestBackend>) -> String {
+    let b = t.backend().buffer();
+    (0..b.area.height)
+        .map(|y| {
+            (0..b.area.width)
+                .map(|x| b[(x, y)].symbol())
+                .collect::<String>()
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Column and row of the first occurrence of `needle` on screen.
+pub fn find(t: &Terminal<TestBackend>, needle: &str) -> Option<(u16, u16)> {
+    screen(t).lines().enumerate().find_map(|(y, line)| {
+        line.find(needle).map(|byte| {
+            (
+                u16::try_from(line[..byte].chars().count()).unwrap(),
+                u16::try_from(y).unwrap(),
+            )
+        })
+    })
+}
