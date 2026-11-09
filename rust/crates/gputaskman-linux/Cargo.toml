@@ -9,9 +9,15 @@ rust-version.workspace = true
 
 [dependencies]
 gputaskman-core = { path = "../gputaskman-core" }
+libc = "0.2.191"
 
 [lints]
 workspace = true
 
+[features]
+test-support = []
+
 [dev-dependencies]
+gputaskman-core = { path = "../gputaskman-core", features = ["test-support"] }
+gputaskman-linux = { path = ".", features = ["test-support"] }
 tempfile = "3.27.0"

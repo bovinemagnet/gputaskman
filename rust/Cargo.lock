@@ -218,6 +218,8 @@ name = "gputaskman-linux"
 version = "0.0.0"
 dependencies = [
  "gputaskman-core",
+ "gputaskman-linux",
+ "libc",
  "tempfile",
 ]
 
