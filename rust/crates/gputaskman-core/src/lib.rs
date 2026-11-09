@@ -1,4 +1,5 @@
 //! Platform-neutral core of gputaskman.
+pub mod collector;
 pub mod env;
 pub mod gguf;
 pub mod handy;
