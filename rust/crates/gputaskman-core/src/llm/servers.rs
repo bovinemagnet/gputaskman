@@ -1,14 +1,14 @@
 //! Read-only probes of local LLM servers. Only loopback, only GET, never inference.
 use crate::traits::{HttpGet, LocalUrl};
 use regex::Regex;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::time::Duration;
 
 pub const PROBE_TIMEOUT: Duration = Duration::from_millis(500);
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ServerModel {
     pub name: Option<String>,
     pub r#type: Option<String>,
@@ -19,7 +19,7 @@ pub struct ServerModel {
     pub path: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ServerInfo {
     pub kind: String,
     pub url: String,

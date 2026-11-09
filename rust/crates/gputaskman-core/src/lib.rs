@@ -8,6 +8,8 @@ pub mod llm;
 pub mod model;
 pub mod procinfo;
 pub mod provenance;
+pub mod report;
+pub mod schema;
 pub mod stores;
 #[cfg(any(test, feature = "test-support"))]
 pub mod testing;

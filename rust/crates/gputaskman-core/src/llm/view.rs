@@ -11,9 +11,9 @@ use crate::gguf::{GgufInfo, MetaValue, is_gguf};
 use crate::model::{Evidence, MIB, MappedModel, ProcDetail};
 use crate::procinfo::models::{ModelContext, abspath};
 use crate::provenance::{Bytes, EstimateSource, Reporter};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SegmentKind {
     Weights,
