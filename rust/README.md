@@ -19,8 +19,13 @@ target/release/gputaskman --list-gpus
 target/release/gputaskman diff before.json after.json
 ```
 
-`diff` reads both Rust (schema v2) and Python (v1) `--json` files. The interactive TUI is not
-ported yet: without `--once` or `--json` the command prints a message and exits.
+`diff` reads both Rust (schema v2) and Python (v1) `--json` files.
+
+Without `--once` or `--json`, `gputaskman` opens the live TUI (all GPUs, or one with `--gpu N`;
+refresh with `-i SECONDS`). Keys: `↑ ↓ PgUp PgDn Home End` select, `s` sort, `c` chart, `a` all
+or top processes, `m` slim or full diagnostics, `p` pause, `?` help, `q` or `Ctrl+C` quit. The
+mouse selects rows, scrolls panes, opens the chart selector and runs the footer's key hints.
+The TUI needs an interactive terminal; with stdout redirected it exits with status 2.
 
 `GPUTASKMAN_PROC_ROOT` and `GPUTASKMAN_SYS_ROOT` replace `/proc` and `/sys`. They exist for tests,
 which point them at fixture trees; they are not a supported way to inspect another machine.
@@ -28,6 +33,8 @@ which point them at fixture trees; they are not a supported way to inspect anoth
 ## Status
 
 - **Milestone 1.** The collector, both Linux backends, the text report, JSON output and `diff`.
+- **Milestone 2.** The interactive TUI (crate `gputaskman-tui`), with the same screen and keys as
+  the Python Textual UI on Linux. Checked against fixtures only, not on GPU hardware.
 - **Native Linux only.** NVML for NVIDIA GPUs and DRM fdinfo for amdgpu cards. WSL, Windows and
   macOS are not supported; under WSL the command collects nothing and says why in a note. CI is
   configured to test the platform-neutral `gputaskman-core` crate on Linux, Windows and macOS, but
@@ -41,6 +48,7 @@ Crates:
 |---|---|
 | `gputaskman-core` | Provenance types, model layer, process inspection, LLM view, text and JSON reports, v1 reader, diff |
 | `gputaskman-linux` | NVML backend, amdgpu DRM backend, PID namespace matching, `/proc` readers |
+| `gputaskman-tui` | The interactive terminal UI: state, actions, screen layout, sampler thread |
 | `gputaskman` | The command-line interface |
 
 ### Deliberate differences from Python
@@ -57,6 +65,10 @@ Crates:
 | An NVML PID hidden (no usage) in one process list and measured in the other is unknown as a whole | Rule 2: part of its memory is unknown. Python counts the measured part in `attributed` although no row shows it |
 | Unknown `vram_total` prints `N/A` in the text report | Rule 2; Python prints `0 MB` |
 | A v1 inferred row without `vram_inferred_by` reads as an order guess (`?`) | Rule 5: without the confidence, `*` cannot be claimed |
+| No `^p` command palette | Textual's built-in palette; `app.py` adds nothing of its own to it |
+| The mouse wheel over the process table moves the selection | ratatui has no scroll view; moving the selection scrolls the table |
+| Spill and Paged cells are blank (not `n/a`) when the backend has no such counter | Rule 2: `n/a` means a counter exists but this value is unknown |
+| The first LLM is auto-selected on the first refresh that has one, unless something is already selected | Python only tries on the first refresh |
 | WSL is refused with a note and no GPU data | NVML under WSL reports Windows host PIDs, which would be charged to the wrong processes; WSL support is later work |
 
 ## Validation
@@ -69,6 +81,9 @@ which gputaskman does not support, so no backend has been checked live.
 | NVML, bare metal | none | **not validated on hardware** |
 | NVML, in a container (own PID namespace) | none | **not validated on hardware** |
 | amdgpu DRM fdinfo | none | **not validated on hardware** |
+
+The TUI is checked against fixture snapshots and the fixture `/sys` and `/proc` trees; it has no
+hardware validation.
 
 Development machine: Intel i915 only (unsupported). Every behaviour above is covered by tests on
 fakes, fixture trees and replayed measurements only, plus parity with the Python implementation.
@@ -100,6 +115,36 @@ Each rule in [`AGENTS.md`](../AGENTS.md) and the Rust tests that cover it.
 | 8. Never bundle driver libraries | Not a test: NVML is loaded at runtime from the installed driver by `nvml-wrapper`; no library is vendored. `loading_the_real_library_never_panics` checks that a missing library does not crash |
 | 9. Degrade with a reason | `linux_backends_does_not_panic_without_drivers`, `no_supported_gpu_gives_an_empty_snapshot_with_a_reason`, `json_without_a_supported_gpu_is_valid_v2`, `snapshot_notes_and_process_status_reach_json_and_text`, `device_failure_is_recorded_and_hides_driver_versions`, `a_failing_gpu_is_skipped_not_fatal`, `test_uninspectable_processes_are_reported`, `backend_status_reports_unreadable_proc_root` |
 | 10. Hardware claims need hardware | Not a test: the validation table above. `backends_match_python` and `report_matches_python` compare with the Python implementation, not with hardware |
+
+## TUI tests ported from Python
+
+These tests from `tests/test_core.py` (`ChartTests` and `UiTests`) are ported, adapted to NVML and
+DRM snapshots:
+
+- `spark_distinguishes_zero_from_missing_and_clamps_values`
+- `chart_palette_uses_distinct_explicit_colors_consistently`
+- `monitoring_toggle_hides_diagnostics_without_changing_live_state`
+- `monitoring_applies_to_every_gpu_and_survives_new_samples`
+- `monitoring_keeps_missing_values_and_backend_provenance`
+- `native_hidden_vram_keeps_engine_reading_in_ui`
+- `unknown_process_memory_preserves_unattributed_adapter_usage`
+- `eighth_chart_records_sm_clock_with_scale_and_missing_readings`
+- `unavailable_device_metrics_render_as_na`
+- `chart_cycle_shows_selected_metric_and_preserves_gaps`
+- `chart_dropdown_is_clickable_and_keyboard_accessible`
+- `multi_gpu_rows_histories_and_selection_stay_separate`
+- `poll_collects_all_adapters_and_closes_each_collector` (as a sampler test)
+- `explicit_gpu_keeps_single_device_layout`
+- `chart_layout_reflows_while_paused_and_keeps_processes_visible`
+- `all_charts_work_without_nvml_or_vram_capacity`
+- `handy_evidence_is_explicit_in_inspector`
+- `likely_kind_is_explicit_in_process_and_inspector`
+- `navigation_sort_pause_and_help`
+
+Two are skipped because WSL is not supported by the Rust build yet:
+
+- `wsl_sort_selection_and_bar_use_inferred_vram_without_double_counting`
+- `multi_gpu_wsl_does_not_claim_process_device_ownership`
 
 ## Parity with Python
 

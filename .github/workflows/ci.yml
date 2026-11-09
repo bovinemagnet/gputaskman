@@ -40,17 +40,17 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.97.0
         with:
           components: clippy, rustfmt
-      - name: Test core (all platforms)
-        run: cargo test -p gputaskman-core
+      - name: Test core and TUI (all platforms)
+        run: cargo test -p gputaskman-core -p gputaskman-tui
       - name: Test Linux crate and CLI
         if: runner.os == 'Linux'
         run: cargo test --workspace
       - name: Clippy
         if: runner.os == 'Linux'
         run: cargo clippy --workspace --all-targets -- -D warnings
-      - name: Clippy (core)
+      - name: Clippy (core and TUI)
         if: runner.os != 'Linux'
-        run: cargo clippy -p gputaskman-core --all-targets -- -D warnings
+        run: cargo clippy -p gputaskman-core -p gputaskman-tui --all-targets -- -D warnings
       - uses: astral-sh/setup-uv@v6
         if: runner.os == 'Linux'
         with:
