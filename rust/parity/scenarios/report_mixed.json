@@ -1,0 +1,15 @@
+{
+  "kind": "report",
+  "backend": "nvml",
+  "vram_total": 25769803776,
+  "vram_used": 6442450944,
+  "shared_used": null,
+  "rows": [
+    {"pid": 100, "name": "llama-server", "kind": "AI", "dedicated": 3221225472, "attributed": true,
+     "engines": {"compute": 87.5, "encode": 0.0}, "owner": "consistent"},
+    {"pid": 101, "name": "hidden", "kind": "app", "dedicated": 0, "attributed": false, "engines": {}},
+    {"pid": 102, "name": "idle", "kind": "app", "dedicated": 0, "attributed": true, "engines": {}},
+    {"pid": 103, "name": "encoder", "kind": "app", "dedicated": 0, "attributed": false,
+     "engines": {"encode": 12.0, "decode": 3.0}}
+  ]
+}

@@ -25,3 +25,38 @@ jobs:
       - run: uv run --locked python -m unittest discover -s tests -v
       - run: uv run --locked gputaskman --help
       - run: uv build
+  rust:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - name: Test core (all platforms)
+        run: cargo test -p gputaskman-core
+      - name: Test Linux crate and CLI
+        if: runner.os == 'Linux'
+        run: cargo test --workspace
+      - name: Clippy
+        if: runner.os == 'Linux'
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Clippy (core)
+        if: runner.os != 'Linux'
+        run: cargo clippy -p gputaskman-core --all-targets -- -D warnings
+      - uses: astral-sh/setup-uv@v6
+        if: runner.os == 'Linux'
+        with:
+          version: "0.9.26"
+          python-version: "3.13"
+      - name: Parity with Python
+        if: runner.os == 'Linux'
+        run: |
+          (cd .. && uv sync --locked)
+          cargo test --workspace --features gputaskman-linux/parity,gputaskman-core/parity

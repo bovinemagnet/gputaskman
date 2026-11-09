@@ -1,6 +1,10 @@
 //! Linux backends for gputaskman.
 pub mod drm;
+#[cfg(any(feature = "test-support", feature = "parity"))]
+pub mod fixtures;
 pub mod nvml;
+#[cfg(feature = "parity")]
+pub mod parity;
 pub mod pidns;
 pub mod procs;
 pub mod sysfs;

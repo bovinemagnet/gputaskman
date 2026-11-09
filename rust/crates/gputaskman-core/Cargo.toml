@@ -9,6 +9,8 @@ rust-version.workspace = true
 
 [features]
 test-support = []
+# Parity tests against the Python implementation (needs `uv`).
+parity = []
 
 [lints]
 workspace = true

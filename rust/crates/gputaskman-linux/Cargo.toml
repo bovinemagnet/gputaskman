@@ -11,12 +11,23 @@ rust-version.workspace = true
 gputaskman-core = { path = "../gputaskman-core" }
 libc = "0.2.191"
 nvml-wrapper = "0.13.0"
+serde = { version = "1.0.229", features = ["derive"], optional = true }
+serde_json = { version = "1.0.154", optional = true }
+tempfile = { version = "3.27.0", optional = true }
 
 [lints]
 workspace = true
 
 [features]
 test-support = []
+# Parity tests against the Python implementation (needs `uv`).
+parity = [
+    "test-support",
+    "gputaskman-core/test-support",
+    "dep:serde",
+    "dep:serde_json",
+    "dep:tempfile",
+]
 
 [dev-dependencies]
 gputaskman-core = { path = "../gputaskman-core", features = ["test-support"] }

@@ -404,6 +404,8 @@ dependencies = [
  "gputaskman-linux",
  "libc",
  "nvml-wrapper",
+ "serde",
+ "serde_json",
  "tempfile",
 ]
 
