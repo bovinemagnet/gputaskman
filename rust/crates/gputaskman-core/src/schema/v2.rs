@@ -139,7 +139,8 @@ pub struct ProcessV2 {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SnapshotV2 {
     pub schema_version: u32,
-    pub taken: f64,
+    /// `None` only when read from a v1 document without a time.
+    pub taken: Option<f64>,
     pub backend: Option<BackendKind>,
     pub adapter: Option<AdapterV2>,
     pub driver: Option<String>,
@@ -308,7 +309,7 @@ fn process(row: &ProcRow, backend: Option<BackendKind>) -> ProcessV2 {
 pub fn from_snapshot(s: &Snapshot) -> SnapshotV2 {
     SnapshotV2 {
         schema_version: SCHEMA_VERSION,
-        taken: s.taken,
+        taken: Some(s.taken),
         backend: s.backend,
         adapter: s.adapter.as_ref().map(adapter),
         driver: s.driver.clone(),

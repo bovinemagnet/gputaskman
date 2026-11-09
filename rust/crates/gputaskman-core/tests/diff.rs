@@ -431,3 +431,40 @@ fn mixed_v1_and_v2_inputs_compare() {
     assert_eq!(d.processes[0].measured.vram_bytes.delta, Some(0));
     assert!(to_text(&d).contains("(no process changed by 16 MB or more)"));
 }
+
+#[test]
+fn rejects_wddm_against_wsl_with_the_backend_names() {
+    let on = |backend: &str| {
+        let mut s = snap(vec![], Some(0), Some(0));
+        s["backend"] = json!(backend);
+        v2(&s)
+    };
+    let err = diff(&on("wddm"), &on("wsl")).unwrap_err();
+    assert_eq!(
+        err,
+        "snapshots are from different GPUs or backends: RTX (wddm) vs RTX (wsl)"
+    );
+    assert!(diff(&on("metal"), &on("metal")).is_ok());
+}
+
+#[test]
+fn missing_taken_gives_no_interval() {
+    let mut a = snap(vec![], Some(0), Some(0));
+    a.as_object_mut().unwrap().remove("taken");
+    let (a, b) = (v2(&a), v2(&snap(vec![], Some(0), Some(0))));
+    assert_eq!(a.taken, None);
+    assert_eq!(a, a.clone());
+    assert_eq!(diff(&a, &b).unwrap().seconds, None);
+}
+
+#[test]
+fn schema_version_absent_is_v1_two_is_v2_anything_else_errors() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut data = snap(vec![], Some(0), Some(0));
+    assert!(load(&write_encoded(&dir, "a.json", &data, "utf-8")).is_ok());
+    data["schema_version"] = json!(3);
+    let err = load(&write_encoded(&dir, "b.json", &data, "utf-8")).unwrap_err();
+    assert!(err.contains("unsupported schema_version 3"), "{err}");
+    data["schema_version"] = json!(1);
+    assert!(load(&write_encoded(&dir, "c.json", &data, "utf-8")).is_err());
+}

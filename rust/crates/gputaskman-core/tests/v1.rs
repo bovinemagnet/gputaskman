@@ -69,3 +69,28 @@ fn segments_map_exact_to_reported() {
         }
     );
 }
+
+#[test]
+fn resident_matches_what_from_snapshot_emits() {
+    let doc = |backend: &str| {
+        json!({"backend": backend, "processes": [
+        {"pid": 1, "name": "l", "vram_bytes": 5, "vram_resident_bytes": 9, "gtt_resident_bytes": null},
+        {"pid": 2, "host": "outside", "name": "o", "vram_resident_bytes": null, "gtt_resident_bytes": null}]})
+    };
+    // NVML: local rows carry no resident block.
+    let nv = from_v1(&doc("nvml")).unwrap();
+    assert_eq!(nv.processes[0].resident, None);
+    // DRM: local rows carry the amdgpu counters, an unreadable one unavailable.
+    let drm = from_v1(&doc("drm")).unwrap();
+    let r = drm.processes[0].resident.as_ref().unwrap();
+    assert_eq!(r.vram, Bytes::measured(9));
+    assert_eq!(r.gtt, Bytes::unavailable(Reason::Legacy));
+    assert!(!r.summable);
+    // Outside rows are unreadable from this namespace on either backend.
+    for s in [&nv, &drm] {
+        let o = s.processes[1].resident.as_ref().unwrap();
+        assert_eq!(o.vram, Bytes::unavailable(Reason::OutsideNamespace));
+        assert_eq!(o.gtt, Bytes::unavailable(Reason::OutsideNamespace));
+        assert!(!o.summable);
+    }
+}

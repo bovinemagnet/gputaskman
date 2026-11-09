@@ -132,7 +132,9 @@ fn llm_model(g: &Value) -> LlmModelV2 {
         decision_type: text(g, "decision_type"),
         params: uint(g, "params"),
         quant: text(g, "quant").unwrap_or_default(),
-        layers: uint(g, "layers").unwrap_or(0) as u32,
+        layers: uint(g, "layers")
+            .and_then(|n| u32::try_from(n).ok())
+            .unwrap_or(0),
         ctx_train: uint(g, "ctx_train"),
         gpu_weight: uint(g, "gpu_weight_bytes")
             .map_or(Bytes::unavailable(Reason::V1Unknown), estimated),
@@ -209,7 +211,33 @@ fn engines(p: &Value) -> EnginesV2 {
     EnginesV2::Measured { busiest, by_engine }
 }
 
-fn process(p: &Value) -> ProcessV2 {
+/// The same rule `from_snapshot` uses: outside rows cannot be read, local rows on a DRM backend carry
+/// the amdgpu counters, and every other row has none.
+fn resident(p: &Value, origin: Origin, backend: Option<BackendKind>) -> Option<ResidentV2> {
+    match origin {
+        Origin::Outside => Some(ResidentV2 {
+            vram: Bytes::unavailable(Reason::OutsideNamespace),
+            gtt: Bytes::unavailable(Reason::OutsideNamespace),
+            summable: false,
+        }),
+        Origin::Local if backend == Some(BackendKind::Drm) => {
+            let missing = if text(p, "vram_unattributed_reason").as_deref() == Some("incomplete") {
+                Reason::Incomplete
+            } else {
+                Reason::Legacy
+            };
+            let get = |k| uint(p, k).map_or(Bytes::unavailable(missing), Bytes::measured);
+            Some(ResidentV2 {
+                vram: get("vram_resident_bytes"),
+                gtt: get("gtt_resident_bytes"),
+                summable: false,
+            })
+        }
+        Origin::Local | Origin::Windows => None,
+    }
+}
+
+fn process(p: &Value, backend: Option<BackendKind>) -> ProcessV2 {
     let by = confidence(nonempty(p, "vram_inferred_by"));
     let (vram, owner_inferred_by) = if let Some(b) = uint(p, "vram_bytes") {
         (Bytes::measured(b), by)
@@ -223,20 +251,14 @@ fn process(p: &Value) -> ProcessV2 {
             None,
         )
     };
-    let resident = (uint(p, "vram_resident_bytes").is_some()
-        || uint(p, "gtt_resident_bytes").is_some())
-    .then(|| ResidentV2 {
-        vram: measured_or_unknown(p, "vram_resident_bytes"),
-        gtt: measured_or_unknown(p, "gtt_resident_bytes"),
-        summable: false,
-    });
+    let origin = match text(p, "host").as_deref() {
+        Some("outside") => Origin::Outside,
+        Some("windows") => Origin::Windows,
+        _ => Origin::Local,
+    };
     ProcessV2 {
-        pid: uint(p, "pid").map(|n| n as u32),
-        origin: match text(p, "host").as_deref() {
-            Some("outside") => Origin::Outside,
-            Some("windows") => Origin::Windows,
-            _ => Origin::Local,
-        },
+        pid: uint(p, "pid").and_then(|n| u32::try_from(n).ok()),
+        origin,
         name: text(p, "name").unwrap_or_default(),
         kind: text(p, "kind").unwrap_or_default(),
         runtimes: items(p, "runtimes")
@@ -248,11 +270,11 @@ fn process(p: &Value) -> ProcessV2 {
         shared: measured_or_unknown(p, "shared_bytes"),
         committed: measured_or_unknown(p, "committed_bytes"),
         paged_out: measured_or_unknown(p, "paged_out_bytes"),
-        resident,
+        resident: resident(p, origin, backend),
         engines: engines(p),
         ports: items(p, "ports")
             .iter()
-            .filter_map(|n| n.as_u64().map(|n| n as u16))
+            .filter_map(|n| u16::try_from(n.as_u64()?).ok())
             .collect(),
         inside: text(p, "inside").unwrap_or_default(),
         model_files: items(p, "model_files").iter().map(model_file).collect(),
@@ -274,7 +296,9 @@ fn adapter(v: &Value, name: &str) -> AdapterV2 {
     AdapterV2 {
         name: name.to_string(),
         vendor: a.and_then(|a| text(a, "vendor")).unwrap_or_default(),
-        vendor_id: get("vendor_id").unwrap_or(0) as u16,
+        vendor_id: get("vendor_id")
+            .and_then(|n| u16::try_from(n).ok())
+            .unwrap_or(0),
         key: a.and_then(|a| text(a, "key")).unwrap_or_default(),
         dedicated_vram: get("dedicated_vram").unwrap_or(0),
         shared_system: get("shared_system").unwrap_or(0),
@@ -299,11 +323,14 @@ fn device(v: &Value) -> Option<DeviceTelemetry> {
     serde_json::from_value(Value::Object(base)).ok()
 }
 
-/// Python backend names this port has no `BackendKind` for (`wddm`, `wsl`, `metal`) become `None`.
+/// An unrecognised backend name becomes `None`, with a note.
 fn backend(v: &Value) -> Option<BackendKind> {
     match text(v, "backend").as_deref() {
         Some("nvml") => Some(BackendKind::Nvml),
         Some("drm") => Some(BackendKind::Drm),
+        Some("wddm") => Some(BackendKind::Wddm),
+        Some("wsl") => Some(BackendKind::Wsl),
+        Some("metal") => Some(BackendKind::Metal),
         _ => None,
     }
 }
@@ -317,13 +344,12 @@ pub fn from_v1(v: &Value) -> Result<SnapshotV2, String> {
         && backend(v).is_none()
     {
         notes.push(format!(
-            "v1 backend '{b}' has no equivalent here; the backend is unknown"
+            "v1 backend '{b}' is not recognised; the backend is unknown"
         ));
     }
     Ok(SnapshotV2 {
         schema_version: SCHEMA_VERSION,
-        // A missing time is NaN: `diff` then reports no interval, and never a made-up one.
-        taken: float(v, "taken").unwrap_or(f64::NAN),
+        taken: float(v, "taken").filter(|t| t.is_finite()),
         backend: backend(v),
         adapter: nonempty(v, "gpu").map(|name| adapter(v, &name)),
         driver: nonempty(v, "driver"),
@@ -347,6 +373,9 @@ pub fn from_v1(v: &Value) -> Result<SnapshotV2, String> {
         },
         device: v.get("device").and_then(device),
         notes,
-        processes: items(v, "processes").iter().map(process).collect(),
+        processes: items(v, "processes")
+            .iter()
+            .map(|p| process(p, backend(v)))
+            .collect(),
     })
 }

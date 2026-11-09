@@ -30,6 +30,10 @@ pub const AI_RUNTIMES: &[&str] = &[
 pub enum BackendKind {
     Nvml,
     Drm,
+    /// Windows backends: only ever produced by the v1 reader, never collected on Linux.
+    Wddm,
+    Wsl,
+    Metal,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

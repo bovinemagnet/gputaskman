@@ -45,9 +45,11 @@ pub fn load(path: &Path) -> Result<SnapshotV2, String> {
     if !data.get("processes").is_some_and(Value::is_array) {
         return Err(format!("{shown} is not a gputaskman --json snapshot"));
     }
-    if data.get("schema_version").and_then(Value::as_u64) == Some(u64::from(SCHEMA_VERSION)) {
-        serde_json::from_value(data).map_err(|e| format!("{shown}: {e}"))
-    } else {
-        v1::from_v1(&data)
+    match data.get("schema_version") {
+        None | Some(Value::Null) => v1::from_v1(&data),
+        Some(v) if v.as_u64() == Some(u64::from(SCHEMA_VERSION)) => {
+            serde_json::from_value(data).map_err(|e| format!("{shown}: {e}"))
+        }
+        Some(v) => Err(format!("{shown}: unsupported schema_version {v}")),
     }
 }

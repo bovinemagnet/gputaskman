@@ -472,8 +472,11 @@ pub fn diff(before: &SnapshotV2, after: &SnapshotV2) -> Result<DiffResult, Strin
         .map(|(b, a, how)| process_change(b, a, how))
         .collect();
     processes.sort_by_key(|p| std::cmp::Reverse(size(p)));
-    let seconds = (before.taken.is_finite() && after.taken.is_finite())
-        .then(|| ((after.taken - before.taken) * 10.0).round() / 10.0);
+    let seconds = before
+        .taken
+        .zip(after.taken)
+        .filter(|(b, a)| b.is_finite() && a.is_finite())
+        .map(|(b, a)| ((a - b) * 10.0).round() / 10.0);
     Ok(DiffResult {
         gpu: ga,
         backend: ba,
