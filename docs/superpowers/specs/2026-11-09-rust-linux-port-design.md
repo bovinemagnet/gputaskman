@@ -135,8 +135,10 @@ pub enum Budget { Deadline(Instant), Unbounded }         // Unbounded for --once
 
 `BackendSample { procs: Map<Pid, ProcGpu>, outside: Map<Pid, ProcGpu>, adapter: AdapterGpu, status: Option<String> }`.
 
-`LocalUrl` can only be built for `127.0.0.1` or `::1` and a port taken from the process's own
-listening sockets (or those of its parents, for front-end processes), which enforces rule 6.
+`LocalUrl` can only be built for `127.0.0.1` or `::1` with an anchored path (one that cannot change
+the host). Restricting the port to the process's own listening sockets (or those of its parents,
+for front-end processes) is enforced by `LocalUrl`'s callers, not by the type. Together they enforce
+rule 6.
 `ProcessSource` has no method that reads another process's memory.
 
 ## 5. Sampling flow
@@ -201,17 +203,16 @@ load); it is empty when nothing degraded.
 `memory.attributed` is `unavailable` with a reason whenever any row's VRAM is unavailable,
 matching Python's `Snapshot.attributed` returning `None`.
 
-A process:
+A process (an NVML row, so `resident` is `null`):
 
 ```json
 {
   "pid": 4242, "origin": "local", "name": "llama-server", "kind": "LLM", "runtimes": ["CUDA"],
   "vram":      {"status": "measured", "bytes": 3221225472}, "owner_inferred_by": null,
-  "shared":    {"status": "measured", "bytes": 0},
+  "shared":    {"status": "unavailable", "reason": "not_on_backend"},
   "committed": {"status": "unavailable", "reason": "not_on_backend"},
   "paged_out": {"status": "unavailable", "reason": "not_on_backend"},
-  "resident":  {"vram": {"status": "measured", "bytes": 0}, "gtt": {"status": "measured", "bytes": 0},
-                "summable": false},
+  "resident":  null,
   "engines":   {"status": "measured", "busiest": 37.5, "by_engine": {"3D": 37.5}},
   "ports": [8080], "inside": "Qwen3 14B Q4_K_M",
   "model_files":      [{"path": "…", "size": 0, "resident": 0, "gguf": true, "evidence": ["api", "mapped"],
@@ -234,8 +235,12 @@ A process:
 
 Rules:
 
-- `origin` is `local` or `outside` (later milestones add `windows`). For `outside` rows, the
-  `resident` values are `unavailable` with `outside_namespace`, since their fds cannot be read.
+- `origin` is `local` or `outside` (later milestones add `windows`).
+- `resident` is `null` on rows whose backend has no resident counters (NVML). On DRM `local` rows
+  it is present when fdinfo gave it, for example
+  `{"vram": {"status": "measured", "bytes": 0}, "gtt": {"status": "measured", "bytes": 0}, "summable": false}`.
+  On `outside` rows both values are `unavailable` with `outside_namespace`, since their fds cannot
+  be read.
 - Fields that are unknown on this backend (`committed` and `paged_out` on Linux) are present and
   `unavailable` with `not_on_backend`, never omitted and never zero.
 - A segment is `reported` when Python marks it `exact` (it came from a runtime's buffer log), and
