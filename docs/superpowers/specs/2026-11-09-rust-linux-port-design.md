@@ -190,11 +190,14 @@ Top level:
   },
   "status": {"process": null, "device": null, "counter": null, "host": null, "wsl_split": null},
   "device": { "…DeviceTelemetry fields, each null when unread…": null },
+  "notes": ["NVML not loaded: …"],
   "processes": [ … ]
 }
 ```
 
 `status.device` is the reason code when device telemetry could not be read, else `null`.
+`notes` lists why parts of the snapshot are missing (for example a vendor library that failed to
+load); it is empty when nothing degraded.
 `memory.attributed` is `unavailable` with a reason whenever any row's VRAM is unavailable,
 matching Python's `Snapshot.attributed` returning `None`.
 
