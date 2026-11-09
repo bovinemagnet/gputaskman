@@ -12,3 +12,6 @@ gputaskman-core = { path = "../gputaskman-core" }
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+tempfile = "3.27.0"
