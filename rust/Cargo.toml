@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/gputaskman-core", "crates/gputaskman-linux", "crates/gputaskman"]
+members = ["crates/gputaskman-core", "crates/gputaskman-linux", "crates/gputaskman-tui", "crates/gputaskman"]
 
 [workspace.package]
 version = "0.0.0"

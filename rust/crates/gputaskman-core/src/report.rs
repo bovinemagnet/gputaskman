@@ -57,7 +57,7 @@ fn opt<T: std::fmt::Display>(v: Option<T>) -> String {
 
 /// Python's `format_metric`: a missing value is `N/A`. `prec` is the `.Nf` precision; without one an
 /// integral value prints without a decimal point, as the integer counters do in Python.
-fn metric(v: Option<f64>, prec: Option<usize>, unit: &str) -> String {
+pub fn metric(v: Option<f64>, prec: Option<usize>, unit: &str) -> String {
     let Some(x) = v else {
         return "N/A".to_string();
     };

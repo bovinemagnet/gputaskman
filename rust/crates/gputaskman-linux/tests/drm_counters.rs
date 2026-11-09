@@ -834,7 +834,10 @@ fn backend_unbounded_policy_lists_every_process() {
     let adapters = budgeted.adapters();
     assert_eq!(adapters.len(), 1);
     assert_eq!(adapters[0].backend, BackendKind::Drm);
-    budgeted.start(&adapters[0], ScanPolicy::Budgeted);
+    budgeted.start(
+        &adapters[0],
+        ScanPolicy::Budgeted(gputaskman_core::collector::SCAN_BUDGET),
+    );
     let partial = budgeted.sample();
     assert!(
         partial

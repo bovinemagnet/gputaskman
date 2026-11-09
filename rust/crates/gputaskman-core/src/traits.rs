@@ -32,7 +32,10 @@ impl Clock for SystemClock {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScanPolicy {
-    Budgeted,
+    /// Deep scans (memory maps, model identification) stop at this deadline each sample; the
+    /// rest wait for the next sample. The TUI divides `SCAN_BUDGET` between its GPUs.
+    Budgeted(Duration),
+    /// One-shot output: identify everything now.
     Unbounded,
 }
 

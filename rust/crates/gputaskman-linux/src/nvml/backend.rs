@@ -28,7 +28,7 @@ impl NvmlBackend {
             ns,
             matcher: PidMatcher::default(),
             selected: None,
-            policy: ScanPolicy::Budgeted,
+            policy: ScanPolicy::Budgeted(gputaskman_core::collector::SCAN_BUDGET),
             last_ts: 0,
         }
     }

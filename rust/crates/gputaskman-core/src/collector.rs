@@ -410,7 +410,7 @@ impl Collector {
             .collect();
         let clock = self.clock.as_ref();
         let deadline = match self.policy {
-            ScanPolicy::Budgeted => Deadline::after(clock, SCAN_BUDGET),
+            ScanPolicy::Budgeted(budget) => Deadline::after(clock, budget),
             ScanPolicy::Unbounded => Deadline::none(),
         };
         let mut ollama_runners: Vec<Pid> = Vec::new();

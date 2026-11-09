@@ -511,13 +511,29 @@ fn three_rows(policy: ScanPolicy, dir: &Path) -> Vec<bool> {
 fn deep_scans_stop_at_the_budget() {
     let dir = tempfile::tempdir().unwrap();
     assert_eq!(
-        three_rows(ScanPolicy::Budgeted, dir.path()),
+        three_rows(ScanPolicy::Budgeted(SCAN_BUDGET), dir.path()),
         vec![true, false, false]
     );
     assert_eq!(
         three_rows(ScanPolicy::Unbounded, dir.path()),
         vec![true, true, true]
     );
+}
+
+#[test]
+fn a_larger_budget_scans_more_rows() {
+    // The fake clock moves 100 ms per reading, so 1 s leaves room for every row.
+    let dir = tempfile::tempdir().unwrap();
+    assert_eq!(
+        three_rows(ScanPolicy::Budgeted(Duration::from_secs(1)), dir.path()),
+        vec![true, true, true]
+    );
+}
+
+#[test]
+fn collector_can_move_to_another_thread() {
+    fn assert_send<T: Send>() {}
+    assert_send::<Collector>();
 }
 
 /// The estimated segments of the LLM view for one `llama-server` row holding `vram` and `gtt`.

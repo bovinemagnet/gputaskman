@@ -1,0 +1,24 @@
+[package]
+name = "gputaskman-tui"
+description = "Interactive terminal UI for gputaskman"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[features]
+# Snapshot builders and a test-backend renderer for this crate's integration tests.
+test-support = ["gputaskman-core/test-support"]
+
+[lints]
+workspace = true
+
+[dependencies]
+crossterm = "0.29.0"
+gputaskman-core = { path = "../gputaskman-core" }
+ratatui = { version = "0.30.2", default-features = false, features = ["crossterm_0_29", "layout-cache", "underline-color", "unstable-rendered-line-info"] }
+
+[dev-dependencies]
+gputaskman-tui = { path = ".", features = ["test-support"] }
+insta = "1.49.0"

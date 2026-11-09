@@ -600,3 +600,12 @@ fn llm_segments_keep_their_provenance() {
     assert_eq!(seg["kind"], "weights");
     assert_eq!(seg["bytes"]["status"], "estimated");
 }
+
+#[test]
+fn metric_formats_like_python_format_metric() {
+    use gputaskman_core::report::metric;
+    assert_eq!(metric(None, None, "%"), "N/A");
+    assert_eq!(metric(Some(47.0), None, "%"), "47%");
+    assert_eq!(metric(Some(2.4), Some(0), ""), "2");
+    assert_eq!(metric(Some(1500.0), Some(0), " MHz"), "1500 MHz");
+}
