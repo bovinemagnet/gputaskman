@@ -7,6 +7,7 @@ use ratatui::widgets::{Block, BorderType, Clear, Padding, Paragraph, Wrap};
 
 use crate::app::App;
 use crate::format::{ACCENT, CYAN, bold, fg};
+use crate::view::scaled;
 
 pub const HELP: &str = r##"# What can be known about GPU memory?
 
@@ -207,8 +208,8 @@ pub fn help_lines() -> Vec<Line<'static>> {
 
 /// Draws the popup centred in `area`; returns how far it can scroll.
 pub fn draw(_app: &App, f: &mut Frame, area: Rect, scroll: u16) -> u16 {
-    let width = (area.width * 95 / 100).min(140);
-    let height = area.height * 85 / 100;
+    let width = scaled(area.width, 95, 100).min(140);
+    let height = scaled(area.height, 85, 100);
     let popup = Rect::new(
         area.x + (area.width - width) / 2,
         area.y + (area.height - height) / 2,

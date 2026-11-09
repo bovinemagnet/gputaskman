@@ -178,3 +178,13 @@ fn closed_stdout_pipe_exits_cleanly_without_a_panic() {
     assert!(!stderr.contains("panicked"), "stderr: {stderr}");
     assert_eq!(out.status.code(), Some(0), "stderr: {stderr}");
 }
+
+#[test]
+fn a_huge_interval_is_a_usage_error_not_a_panic() {
+    let dir = tempfile::tempdir().unwrap();
+    cmd(dir.path())
+        .args(["-i", "1e30"])
+        .assert()
+        .code(2)
+        .stderr(predicates::str::contains("--interval is too large"));
+}

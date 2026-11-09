@@ -20,6 +20,11 @@ use crate::format::{ACCENT, GREY50, fg};
 pub const MIN_WIDTH: u16 = 40;
 pub const MIN_HEIGHT: u16 = 10;
 
+/// `value * numerator / denominator` without u16 overflow on very large screens.
+pub fn scaled(value: u16, numerator: u32, denominator: u32) -> u16 {
+    u16::try_from(u32::from(value) * numerator / denominator).unwrap_or(u16::MAX)
+}
+
 /// A rounded, padded box around wrapped lines, and the rows it needs at `width`.
 fn boxed(
     lines: Vec<Line<'static>>,
@@ -88,7 +93,7 @@ pub fn draw(app: &App, f: &mut Frame) -> Areas {
         width,
         GREY50,
     );
-    let inspector_h = inspector_h.min(area.height * 3 / 10).max(3);
+    let inspector_h = inspector_h.min(scaled(area.height, 3, 10)).max(3);
 
     let [dash, table_area, insp, footer_area] = Layout::vertical([
         Constraint::Length(dash_h),

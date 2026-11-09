@@ -229,3 +229,26 @@ fn before_the_first_sample_the_screen_still_draws() {
     let t = render(&mut app, 120, 40);
     assert!(screen(&t).contains("Sampling GPU counters..."));
 }
+
+#[test]
+fn the_help_popup_survives_a_very_wide_screen() {
+    let mut app = App::default();
+    app.apply_all(vec![snapshot()]);
+    press(&mut app, KeyCode::Char('?'));
+    let t = render(&mut app, 700, 40);
+    assert!(screen(&t).contains("What can be known about GPU memory?"));
+    let top = screen(&t).lines().nth(3).unwrap().to_string();
+    let left = top.chars().position(|c| c == '┏').unwrap();
+    let right = top.chars().position(|c| c == '┓').unwrap();
+    assert!(right - left < 140, "popup is {} wide", right - left + 1);
+}
+
+#[test]
+fn a_very_tall_screen_draws() {
+    let mut app = App::default();
+    app.apply_all(vec![with_device()]);
+    let t = render(&mut app, 240, 800);
+    assert!(screen(&t).contains("q Quit"));
+    press(&mut app, KeyCode::Char('?'));
+    render(&mut app, 240, 800);
+}

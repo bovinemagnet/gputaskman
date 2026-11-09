@@ -89,6 +89,10 @@ pub fn run() -> i32 {
         return usage_error("--interval must be a finite number greater than zero");
     }
 
+    let Ok(interval) = Duration::try_from_secs_f64(cli.interval) else {
+        return usage_error("--interval is too large");
+    };
+
     let root = |var: &str, default: &str| {
         std::env::var_os(var).map_or_else(|| PathBuf::from(default), PathBuf::from)
     };
@@ -111,7 +115,7 @@ pub fn run() -> i32 {
 
     if !(cli.once || cli.json) {
         drop(backends);
-        return tui_main(&cli, &sys_root, &proc_root);
+        return tui_main(&cli, interval, &sys_root, &proc_root);
     }
 
     let deps = CollectorDeps {
@@ -151,7 +155,12 @@ fn diff_main(before: &std::path::Path, after: &std::path::Path, json: bool) -> i
 }
 
 /// The live TUI: one collector per GPU (or just `--gpu N`), sharing the scan budget.
-fn tui_main(cli: &Cli, sys_root: &std::path::Path, proc_root: &std::path::Path) -> i32 {
+fn tui_main(
+    cli: &Cli,
+    interval: Duration,
+    sys_root: &std::path::Path,
+    proc_root: &std::path::Path,
+) -> i32 {
     if !std::io::stdout().is_terminal() {
         eprintln!("the TUI needs an interactive terminal; use --once or --json");
         return 2;
@@ -182,9 +191,7 @@ fn tui_main(cli: &Cli, sys_root: &std::path::Path, proc_root: &std::path::Path) 
             Err(e) => return usage_error(&e.to_string()),
         }
     }
-    let config = Config {
-        interval: Duration::from_secs_f64(cli.interval),
-    };
+    let config = Config { interval };
     match gputaskman_tui::run(sources, config) {
         Ok(()) => 0,
         Err(e) => {
