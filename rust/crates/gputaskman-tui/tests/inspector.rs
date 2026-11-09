@@ -212,3 +212,18 @@ fn several_gpus_name_the_gpu_and_warn_about_placement() {
     assert_eq!(title(&app), "llama-server (10) - LLM - GPU 1");
     assert!(text(&app).contains("not a measured per-device model placement"));
 }
+
+#[test]
+fn the_resident_line_needs_at_least_one_known_side() {
+    let mut s = snapshot();
+    s.backend = Some(BackendKind::Drm);
+    let mut g = ProcGpu::measured(0);
+    g.vram = Bytes::unavailable(Reason::SharedClient);
+    g.resident = Some(Resident {
+        vram: Bytes::unavailable(Reason::Legacy),
+        gtt: Bytes::unavailable(Reason::Legacy),
+    });
+    s.procs = vec![row(30, "rocm-app", "AI", g)];
+    let t = text(&selected(s, "30"));
+    assert!(!t.contains("Resident"), "{t}");
+}

@@ -2,7 +2,7 @@
 //! xterm-256 indices; the chart colours (in `history`) are exact RGB.
 use gputaskman_core::llm::gb;
 use gputaskman_core::llm::view::SegmentKind;
-use gputaskman_core::provenance::{Bytes, Reason};
+use gputaskman_core::provenance::{Bytes, Reason, Reporter};
 use ratatui::style::{Color, Modifier, Style};
 
 pub const MIB: u64 = 1 << 20;
@@ -69,6 +69,15 @@ pub fn segment_color(kind: SegmentKind) -> Color {
     }
 }
 
+fn reporter_name(by: Reporter) -> &'static str {
+    match by {
+        Reporter::LoadLog => "log",
+        Reporter::LlamaServerApi => "llama-server",
+        Reporter::OllamaApi => "ollama",
+        Reporter::LmStudioApi => "lmstudio",
+    }
+}
+
 /// One byte value as text: blank when the backend has no such counter, `n/a` when it has one but
 /// this value is unknown, otherwise the size with what kind of number it is.
 pub fn bytes_text(b: &Bytes) -> String {
@@ -76,7 +85,7 @@ pub fn bytes_text(b: &Bytes) -> String {
         Bytes::Measured { bytes } => gb(bytes as f64),
         Bytes::Inferred { bytes, by } => format!("{}{}", gb(bytes as f64), by.marker()),
         Bytes::Estimated { bytes, .. } => format!("{} (est)", gb(bytes as f64)),
-        Bytes::Reported { bytes, .. } => format!("{} (reported)", gb(bytes as f64)),
+        Bytes::Reported { bytes, by } => format!("{} ({})", gb(bytes as f64), reporter_name(by)),
         Bytes::Unavailable {
             reason: Reason::NotOnBackend,
         } => String::new(),

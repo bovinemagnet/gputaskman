@@ -18,10 +18,8 @@ expression: "screen(&render(&mut app, 140, 42))"
 │ Recent samples · blank = no reading · power 0–200 W · SM clock 0–2100 MHz                                                                │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
      PID Process                Kind        Runtime                    VRAM     Spill     Paged  GPU%   3D  Copy  Video What's inside       
-      10 llama-server           LLM                                 8.00 GB                                                                 
+      10 llama-server           LLM                                 8.00 GB                                             Qwen3-1.7B 752M ?   
       20 Xorg                   compositor                          2.00 GB                                             desktop back buffers
-                                                                                                                                            
-                                                                                                                                            
                                                                                                                                             
                                                                                                                                             
                                                                                                                                             
@@ -38,8 +36,10 @@ expression: "screen(&render(&mut app, 140, 42))"
 sort: VRAM  ·  top processes────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 ╭llama-server (10) - LLM───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ VRAM 8.00 GB   spill(RAM) n/a   paged(est) n/a   engines idle                                                                            │
-│ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░                                     │
-│                                                                                                                                          │
+│ ████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░                                     │
+│ ■ weights (CUDA0) 604 MB  ■ KV cache 448 MB  (allocated sizes from server.log)                                                           │
+│      model       arch   params  quant  layers  train ctx  on GPU (est)  evidence         file                                            │
+│ LLM  Qwen3-1.7B  qwen3  752M    ?      2       4,096      1.00 GB       in use (mapped)  Qwen3-1.7B.gguf                                 │
 │ server llama-server http://127.0.0.1:8080                                                                                                │
 │ server --api-key private-test-value                                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯

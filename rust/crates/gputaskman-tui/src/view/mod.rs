@@ -177,7 +177,16 @@ pub fn draw(app: &App, f: &mut Frame) -> Areas {
             } else {
                 dash
             };
-            let menu = Rect::new(anchor.x, anchor.y.saturating_add(1), w, h).intersection(area);
+            let menu = Rect::new(
+                anchor.x.min(area.right().saturating_sub(w)),
+                anchor
+                    .y
+                    .saturating_add(1)
+                    .min(area.bottom().saturating_sub(h)),
+                w,
+                h,
+            )
+            .intersection(area);
             let items: Vec<ListItem<'static>> = entries.into_iter().map(ListItem::new).collect();
             let list = List::new(items)
                 .block(Block::bordered().border_style(fg(ACCENT)))

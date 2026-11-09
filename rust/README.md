@@ -37,8 +37,8 @@ which point them at fixture trees; they are not a supported way to inspect anoth
   the Python Textual UI on Linux. Checked against fixtures only, not on GPU hardware.
 - **Native Linux only.** NVML for NVIDIA GPUs and DRM fdinfo for amdgpu cards. WSL, Windows and
   macOS are not supported; under WSL the command collects nothing and says why in a note. CI is
-  configured to test the platform-neutral `gputaskman-core` crate on Linux, Windows and macOS, but
-  has not run yet (workflows are not yet enabled on the fork), so only Linux has been checked.
+  configured to test the platform-neutral `gputaskman-core` and `gputaskman-tui` crates on Linux,
+  Windows and macOS, but has not run yet (workflows are not yet enabled on the fork), so only Linux has been checked.
 - **JSON schema v2 is unstable.** Field names and shapes may still change. Every number carries its
   provenance (`measured`, `inferred`, `estimated`, `reported` or `unavailable` with a reason).
 
@@ -67,7 +67,6 @@ Crates:
 | A v1 inferred row without `vram_inferred_by` reads as an order guess (`?`) | Rule 5: without the confidence, `*` cannot be claimed |
 | No `^p` command palette | Textual's built-in palette; `app.py` adds nothing of its own to it |
 | The mouse wheel over the process table moves the selection | ratatui has no scroll view; moving the selection scrolls the table |
-| Spill and Paged cells are blank (not `n/a`) when the backend has no such counter | Rule 2: `n/a` means a counter exists but this value is unknown |
 | The first LLM is auto-selected on the first refresh that has one, unless something is already selected | Python only tries on the first refresh |
 | WSL is refused with a note and no GPU data | NVML under WSL reports Windows host PIDs, which would be charged to the wrong processes; WSL support is later work |
 
@@ -119,27 +118,29 @@ Each rule in [`AGENTS.md`](../AGENTS.md) and the Rust tests that cover it.
 ## TUI tests ported from Python
 
 These tests from `tests/test_core.py` (`ChartTests` and `UiTests`) are ported, adapted to NVML and
-DRM snapshots:
+DRM snapshots. Rust tests are in `crates/gputaskman-tui/tests/`.
 
-- `spark_distinguishes_zero_from_missing_and_clamps_values`
-- `chart_palette_uses_distinct_explicit_colors_consistently`
-- `monitoring_toggle_hides_diagnostics_without_changing_live_state`
-- `monitoring_applies_to_every_gpu_and_survives_new_samples`
-- `monitoring_keeps_missing_values_and_backend_provenance`
-- `native_hidden_vram_keeps_engine_reading_in_ui`
-- `unknown_process_memory_preserves_unattributed_adapter_usage`
-- `eighth_chart_records_sm_clock_with_scale_and_missing_readings`
-- `unavailable_device_metrics_render_as_na`
-- `chart_cycle_shows_selected_metric_and_preserves_gaps`
-- `chart_dropdown_is_clickable_and_keyboard_accessible`
-- `multi_gpu_rows_histories_and_selection_stay_separate`
-- `poll_collects_all_adapters_and_closes_each_collector` (as a sampler test)
-- `explicit_gpu_keeps_single_device_layout`
-- `chart_layout_reflows_while_paused_and_keeps_processes_visible`
-- `all_charts_work_without_nvml_or_vram_capacity`
-- `handy_evidence_is_explicit_in_inspector`
-- `likely_kind_is_explicit_in_process_and_inspector`
-- `navigation_sort_pause_and_help`
+| Python test | Rust test (file::name) |
+|---|---|
+| `spark_distinguishes_zero_from_missing_and_clamps_values` | `format.rs::spark_distinguishes_zero_from_missing_and_clamps_values` |
+| `chart_palette_uses_distinct_explicit_colors_consistently` | `history.rs::chart_palette_uses_distinct_explicit_colours`, `header.rs::the_metrics_line_uses_the_chart_colours` |
+| `monitoring_toggle_hides_diagnostics_without_changing_live_state` | `header.rs::monitoring_toggle_hides_diagnostics_without_changing_live_state` |
+| `monitoring_applies_to_every_gpu_and_survives_new_samples` | `header.rs::monitoring_applies_to_every_gpu` |
+| `monitoring_keeps_missing_values_and_backend_provenance` | `header.rs::monitoring_keeps_missing_values_and_provenance` |
+| `native_hidden_vram_keeps_engine_reading_in_ui` | `table.rs::native_hidden_vram_keeps_the_engine_reading`, `inspector.rs::native_hidden_vram_keeps_the_engine_reading` |
+| `unknown_process_memory_preserves_unattributed_adapter_usage` | `header.rs::unknown_process_memory_stays_unattributed` |
+| `eighth_chart_records_sm_clock_with_scale_and_missing_readings` | `history.rs::eighth_chart_records_sm_clock_with_scale_and_missing_readings`, `charts.rs::eighth_chart_shows_sm_clock_with_its_scale` |
+| `unavailable_device_metrics_render_as_na` | `header.rs::unavailable_device_metrics_render_as_na`, `history.rs::unavailable_device_metrics_record_as_missing_and_zero_stays_zero` |
+| `chart_cycle_shows_selected_metric_and_preserves_gaps` | `charts.rs::chart_cycle_shows_the_selected_metric_alone_and_preserves_gaps`, `app.rs::chart_cycle_visits_all_then_each_chart` |
+| `chart_dropdown_is_clickable_and_keyboard_accessible` | `screen.rs::chart_dropdown_is_clickable_and_keyboard_accessible`, `app.rs::chart_menu_is_keyboard_accessible`, `charts.rs::the_selector_names_the_mode_and_the_menu_lists_every_mode` |
+| `multi_gpu_rows_histories_and_selection_stay_separate` | `rows.rs::several_gpus_prefix_keys_with_the_gpu_and_sort_together`, `app.rs::selection_keys_follow_the_gpu_count`, `app.rs::each_gpu_keeps_its_own_history_and_chart_values`, `charts.rs::several_gpus_get_their_own_grids_and_notes`, `screen.rs::several_gpus_show_both_devices_and_a_gpu_column` |
+| `poll_collects_all_adapters_and_closes_each_collector` | `sampler.rs::the_sampler_collects_every_gpu_and_drops_each_collector` |
+| `explicit_gpu_keeps_single_device_layout` | `table.rs::explicit_gpu_keeps_single_device_layout` |
+| `chart_layout_reflows_while_paused_and_keeps_processes_visible` | `screen.rs::chart_layout_reflows_while_paused_and_keeps_processes_visible`, `charts.rs::chart_layout_reflows_with_the_width` |
+| `all_charts_work_without_nvml_or_vram_capacity` | `charts.rs::all_charts_work_without_device_telemetry_or_vram_capacity` |
+| `handy_evidence_is_explicit_in_inspector` | `inspector.rs::handy_evidence_is_explicit` |
+| `likely_kind_is_explicit_in_process_and_inspector` | `table.rs::likely_kind_is_explicit_in_the_kind_column`, `inspector.rs::likely_kind_and_evidence_are_explicit_in_the_model_table` |
+| `navigation_sort_pause_and_help` | `app.rs::navigation_sort_pause_and_help` |
 
 Two are skipped because WSL is not supported by the Rust build yet:
 

@@ -61,9 +61,14 @@ pub fn from_key(key: KeyEvent, app: &App) -> Option<Action> {
     if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
         return Some(Action::Quit);
     }
+    // Letter bindings are for plain keys; Ctrl or Alt chords belong to the terminal.
+    let held = key
+        .modifiers
+        .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT);
     match app.popup {
         Popup::Help { .. } => match key.code {
-            KeyCode::Esc | KeyCode::Char('q' | '?') => Some(Action::ClosePopup),
+            KeyCode::Esc => Some(Action::ClosePopup),
+            KeyCode::Char('q' | '?') if !held => Some(Action::ClosePopup),
             KeyCode::Up => Some(Action::Scroll(Pane::Help, -1)),
             KeyCode::Down => Some(Action::Scroll(Pane::Help, 1)),
             KeyCode::PageUp => Some(Action::Scroll(Pane::Help, -10)),
@@ -79,6 +84,7 @@ pub fn from_key(key: KeyEvent, app: &App) -> Option<Action> {
             KeyCode::Esc => Some(Action::ClosePopup),
             _ => None,
         },
+        Popup::None if held => None,
         Popup::None => match key.code {
             KeyCode::Char('q') => Some(Action::Quit),
             KeyCode::Char('s') => Some(Action::CycleSort),
@@ -110,6 +116,8 @@ pub fn from_mouse(m: MouseEvent, app: &App) -> Option<Action> {
             };
             if matches!(app.popup, Popup::Help { .. }) {
                 Some(Action::Scroll(Pane::Help, 3 * sign))
+            } else if matches!(app.popup, Popup::ChartMenu { .. }) {
+                None
             } else if at(a.table_body) {
                 Some(Action::Scroll(Pane::Table, sign)) // ruling R1
             } else if at(a.inspector) {

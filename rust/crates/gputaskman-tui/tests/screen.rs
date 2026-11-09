@@ -252,3 +252,62 @@ fn a_very_tall_screen_draws() {
     press(&mut app, KeyCode::Char('?'));
     render(&mut app, 240, 800);
 }
+
+#[test]
+fn the_spec_size_screen_shows_every_part_in_three_chart_columns() {
+    let mut app = App::default();
+    app.apply_all(vec![with_device()]);
+    let t = render(&mut app, 240, 50);
+    let text = screen(&t);
+    for part in [
+        "Full diagnostics",
+        "Charts",
+        "PID",
+        "What's inside",
+        "q Quit",
+        "? Explain",
+    ] {
+        assert!(text.contains(part), "{part} missing from\n{text}");
+    }
+    assert_eq!(gputaskman_tui::view::charts::grid_columns(8, 240), 3);
+    let row = text.lines().find(|l| l.contains("SM clock")).unwrap();
+    assert!(row.contains("GPU ") && row.contains("VRAM"), "{row}");
+    assert!(!row.contains("Mem activity"), "{row}");
+    assert!(app.areas.table_body.height >= 4);
+}
+
+#[test]
+fn the_chart_menu_is_shifted_to_fit_and_its_rows_stay_clickable() {
+    let (w, h) = (80, 14);
+    let mut app = App::default();
+    app.apply_all(vec![with_device()]);
+    render(&mut app, w, h);
+    let max = app.areas.dashboard_max_scroll;
+    assert!(max > 0);
+    let mut near_bottom = false;
+    for scroll in 0..=max {
+        app.popup = Popup::None;
+        app.dashboard_scroll = scroll;
+        let t = render(&mut app, w, h);
+        let Some(at) = find(&t, "[All charts ▾]") else {
+            continue;
+        };
+        near_bottom |= at.1 + 1 >= app.areas.dashboard.bottom() - 1;
+        click_at(&mut app, at);
+        let t = render(&mut app, w, h);
+        let menu = app.areas.chart_menu;
+        assert_eq!(menu.height, 11, "scroll {scroll}: {menu:?}");
+        assert!(menu.bottom() <= h && menu.right() <= w, "{menu:?}");
+        let text = screen(&t);
+        for entry in ["All charts", "Decoder", "Mem activity"] {
+            assert!(text.contains(entry), "{entry} missing from\n{text}");
+        }
+        click_at(&mut app, (menu.x + 2, menu.y + 1));
+        assert_eq!(app.chart, None, "scroll {scroll}");
+        assert_eq!(app.popup, Popup::None);
+    }
+    assert!(
+        near_bottom,
+        "the selector never reached the dashboard's last row"
+    );
+}

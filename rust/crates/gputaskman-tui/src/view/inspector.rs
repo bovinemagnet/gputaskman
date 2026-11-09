@@ -182,6 +182,7 @@ fn provenance_notes(row: &ProcRow, s: &Snapshot) -> Vec<Line<'static>> {
     if drm
         && local
         && let Some(res) = &g.resident
+        && (res.vram.value().is_some() || res.gtt.value().is_some())
     {
         let size = |b: Bytes| {
             b.value()

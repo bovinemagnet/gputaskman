@@ -62,7 +62,7 @@ fn bytes_text_follows_provenance() {
             bytes: gib,
             by: Reporter::LoadLog
         }),
-        "1.00 GB (reported)"
+        "1.00 GB (log)"
     );
     assert_eq!(bytes_text(&Bytes::unavailable(Reason::NotOnBackend)), "");
     assert_eq!(bytes_text(&Bytes::unavailable(Reason::SharedClient)), "n/a");
@@ -105,4 +105,20 @@ fn thousands_groups_digits() {
     assert_eq!(thousands(40960), "40,960");
     assert_eq!(thousands(999), "999");
     assert_eq!(thousands(1_000_000), "1,000,000");
+}
+
+#[test]
+fn reported_values_name_their_reporter() {
+    let gib = 1u64 << 30;
+    for (by, label) in [
+        (Reporter::LoadLog, "(log)"),
+        (Reporter::LlamaServerApi, "(llama-server)"),
+        (Reporter::OllamaApi, "(ollama)"),
+        (Reporter::LmStudioApi, "(lmstudio)"),
+    ] {
+        assert_eq!(
+            bytes_text(&Bytes::Reported { bytes: gib, by }),
+            format!("1.00 GB {label}")
+        );
+    }
 }

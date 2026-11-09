@@ -1,4 +1,5 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
+use gputaskman_core::model::ProcGpu;
 use gputaskman_core::provenance::Bytes;
 use gputaskman_tui::action::{Action, Pane, from_key, from_mouse};
 use gputaskman_tui::app::{App, CHART_MODES, Popup};
@@ -229,4 +230,95 @@ fn sorting_keeps_the_selected_process_selected() {
     app.selected = Some("10".into());
     key(&mut app, KeyCode::Char('s'));
     assert_eq!(app.selected.as_deref(), Some("10"));
+}
+
+#[test]
+fn the_wheel_does_nothing_behind_the_open_chart_menu() {
+    let mut app = App::default();
+    app.apply_all(vec![snapshot()]);
+    app.areas.table_body = Rect::new(0, 20, 100, 10);
+    app.areas.dashboard = Rect::new(0, 0, 100, 10);
+    app.update(Action::OpenChartMenu);
+    for kind in [MouseEventKind::ScrollDown, MouseEventKind::ScrollUp] {
+        for row in [5, 21] {
+            let ev = MouseEvent {
+                kind,
+                column: 1,
+                row,
+                modifiers: KeyModifiers::NONE,
+            };
+            assert_eq!(from_mouse(ev, &app), None);
+        }
+    }
+}
+
+#[test]
+fn plain_letter_bindings_ignore_ctrl_and_alt_but_ctrl_c_still_quits() {
+    let mut app = App::default();
+    app.apply_all(vec![snapshot()]);
+    for modifier in [KeyModifiers::CONTROL, KeyModifiers::ALT] {
+        for c in ['q', 's', 'c', 'a', 'm', 'p', '?'] {
+            let ev = KeyEvent::new(KeyCode::Char(c), modifier);
+            if modifier == KeyModifiers::CONTROL && c == 'c' {
+                assert_eq!(from_key(ev, &app), Some(Action::Quit));
+            } else {
+                assert_eq!(from_key(ev, &app), None, "{modifier:?}+{c}");
+            }
+        }
+    }
+    let shifted = KeyEvent::new(KeyCode::Char('?'), KeyModifiers::SHIFT);
+    assert_eq!(from_key(shifted, &app), Some(Action::Help));
+    app.update(Action::Help);
+    let alt_q = KeyEvent::new(KeyCode::Char('q'), KeyModifiers::ALT);
+    assert_eq!(from_key(alt_q, &app), None);
+}
+
+#[test]
+fn each_gpu_keeps_its_own_history_and_chart_values() {
+    let gpu = |util: f64, temp: f64| {
+        let mut s = snapshot();
+        let mut d = device("GPU");
+        d.util_gpu = Some(util);
+        d.temp = Some(temp);
+        s.device = Some(d);
+        s
+    };
+    let mut app = App::default();
+    app.apply_all(vec![gpu(30.0, 61.0), gpu(70.0, 45.0)]);
+    app.apply_all(vec![gpu(31.0, 62.0), gpu(71.0, 46.0)]);
+    assert_eq!(
+        app.histories[0].values(Chart::Gpu),
+        [Some(30.0), Some(31.0)]
+    );
+    assert_eq!(
+        app.histories[1].values(Chart::Gpu),
+        [Some(70.0), Some(71.0)]
+    );
+    assert_eq!(app.histories[0].current(Chart::Temperature), Some(62.0));
+    assert_eq!(app.histories[1].current(Chart::Temperature), Some(46.0));
+    let text = plain(&gputaskman_tui::view::charts::chart_lines(&app, 117));
+    let (first, second) = text.split_once("GPU 1\n").unwrap();
+    assert!(first.contains("31%") && first.contains("62°C"), "{first}");
+    assert!(!first.contains("71%") && !first.contains("46°C"), "{first}");
+    assert!(
+        second.contains("71%") && second.contains("46°C"),
+        "{second}"
+    );
+    assert!(
+        !second.contains("31%") && !second.contains("62°C"),
+        "{second}"
+    );
+}
+
+#[test]
+fn a_selected_row_the_top_filter_hides_is_deselected() {
+    let mut s = snapshot();
+    s.procs.push(row(40, "tiny", "app", ProcGpu::measured(MIB)));
+    let mut app = App::default();
+    app.apply_all(vec![s]);
+    key(&mut app, KeyCode::Char('a'));
+    app.update(Action::Select(2));
+    assert_eq!(app.selected.as_deref(), Some("40"));
+    key(&mut app, KeyCode::Char('a'));
+    assert_eq!(app.selected, None);
 }

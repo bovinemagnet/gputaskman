@@ -1,6 +1,9 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
-use gputaskman_core::model::{BackendKind, ProcGpu, VENDOR_AMD, VENDOR_NVIDIA};
-use gputaskman_core::provenance::{Bytes, Reason};
+use gputaskman_core::llm::view::{Segment, SegmentKind};
+use gputaskman_core::model::{
+    BackendKind, Engines, Evidence, MappedModel, ProcGpu, VENDOR_AMD, VENDOR_NVIDIA,
+};
+use gputaskman_core::provenance::{Bytes, EstimateSource, Reason, Reporter};
 use gputaskman_tui::app::App;
 use gputaskman_tui::fixtures::*;
 
@@ -23,8 +26,41 @@ fn nvidia() -> gputaskman_core::collector::Snapshot {
 
 #[test]
 fn golden_nvml_single_gpu_with_an_llm_selected() {
+    let mut s = nvidia();
+    let mut view = server_view();
+    view.models = vec![gguf("qwen3", "Qwen3-1.7B")];
+    view.files = vec![MappedModel {
+        path: "/models/Qwen3-1.7B.gguf".into(),
+        size: GIB,
+        resident: 0,
+        gguf: true,
+        sources: vec![Evidence::Mapped],
+        store_name: None,
+        kind: "LLM".into(),
+        kind_hint: String::new(),
+    }];
+    view.segments = vec![
+        Segment {
+            label: "weights (CUDA0)".into(),
+            bytes: Bytes::Reported {
+                bytes: 604 * MIB,
+                by: Reporter::LoadLog,
+            },
+            kind: SegmentKind::Weights,
+        },
+        Segment {
+            label: "KV cache".into(),
+            bytes: Bytes::Estimated {
+                bytes: 448 * MIB,
+                from: EstimateSource::Gguf,
+            },
+            kind: SegmentKind::Kv,
+        },
+    ];
+    view.log_source = Some("/var/log/llama/server.log".into());
+    s.procs[0].llm = Some(view);
     let mut app = App::default();
-    app.apply_all(vec![nvidia()]);
+    app.apply_all(vec![s]);
     insta::assert_snapshot!(screen(&render(&mut app, 140, 42)));
 }
 
@@ -36,6 +72,9 @@ fn golden_drm_with_a_shared_client() {
     let mut shared = row(30, "firefox", "browser", ProcGpu::measured(0));
     shared.gpu.vram = Bytes::unavailable(Reason::SharedClient);
     shared.gpu.shared = Bytes::unavailable(Reason::SharedClient);
+    shared.gpu.engines = Engines::Unavailable {
+        reason: Reason::SharedClient,
+    };
     s.procs.push(shared);
     let mut app = App::default();
     app.selected = Some("30".into());
