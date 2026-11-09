@@ -61,13 +61,13 @@ fn interval_message_matches_python() {
 }
 
 #[test]
-fn without_once_or_json_the_tui_message_is_printed() {
+fn the_tui_needs_a_terminal() {
     let dir = tempfile::tempdir().unwrap();
     cmd(dir.path())
         .assert()
         .code(2)
         .stderr(predicates::str::contains(
-            "the TUI is not available yet in the Rust build; use --once or --json",
+            "the TUI needs an interactive terminal; use --once or --json",
         ));
 }
 

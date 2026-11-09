@@ -1,0 +1,34 @@
+---
+source: crates/gputaskman-tui/tests/golden.rs
+expression: "screen(&render(&mut app, 120, 30))"
+---
+╭Full diagnostics──────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ GPU                                                                                                                  │
+│ VRAM ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ N/A / N/A                      │
+│                                                                                                                      │
+│      NVML not loaded: libnvidia-ml.so.1: cannot open shared object file                                              │
+│      no supported GPU found (NVIDIA through NVML, or an amdgpu card)                                                 │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Charts  [All charts ▾]  Click to choose · c cycles                                                                   │
+│ GPU               N/A                                     SM clock          N/A                                      │
+│ VRAM              N/A                                     Mem activity      N/A                                      │
+│ Temperature       N/A                                     Power             N/A                                      │
+│ Encoder           N/A                                     Decoder           N/A                                      │
+│ Recent samples · blank = no reading · power 0–1 W · SM clock 0–1 MHz                                                 │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+     PID Process                Kind        Runtime                    VRAM     Spill     Paged  GPU%   3D  Copy  Video 
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+sort: VRAM  ·  top processes────────────────────────────────────────────────────────────────────────────────────────────
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Select a process (↑/↓) to see what's inside its GPU memory.  Press ? to learn what's knowable.                       │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+q Quit  s Sort  c Chart  a All/Top  m Slim/Full  p Pause  ? Explain

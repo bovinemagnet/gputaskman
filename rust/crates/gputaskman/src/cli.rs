@@ -1,17 +1,18 @@
 //! Argument handling and the one-shot flow, mirroring the Python `cli.py`.
-use std::io::Write;
+use std::io::{IsTerminal, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
 use clap::error::ErrorKind;
 use clap::{CommandFactory, Parser, Subcommand};
-use gputaskman_core::collector::{Collector, CollectorDeps, list_adapters};
+use gputaskman_core::collector::{Collector, CollectorDeps, SCAN_BUDGET, list_adapters};
 use gputaskman_core::env::Paths;
 use gputaskman_core::http::UreqGet;
 use gputaskman_core::traits::{Clock, ScanPolicy, SystemClock};
 use gputaskman_core::{diff, report, schema};
 use gputaskman_linux::{linux_backends_at, procs::LinuxProcs};
+use gputaskman_tui::{Config, Source};
 
 #[derive(Parser)]
 #[command(
@@ -109,8 +110,8 @@ pub fn run() -> i32 {
     }
 
     if !(cli.once || cli.json) {
-        eprintln!("the TUI is not available yet in the Rust build; use --once or --json");
-        return 2;
+        drop(backends);
+        return tui_main(&cli, &sys_root, &proc_root);
     }
 
     let deps = CollectorDeps {
@@ -146,5 +147,49 @@ fn diff_main(before: &std::path::Path, after: &std::path::Path, json: bool) -> i
         },
         Ok(d) => emit(&diff::to_text(&d)),
         Err(e) => usage_error(&e),
+    }
+}
+
+/// The live TUI: one collector per GPU (or just `--gpu N`), sharing the scan budget.
+fn tui_main(cli: &Cli, sys_root: &std::path::Path, proc_root: &std::path::Path) -> i32 {
+    if !std::io::stdout().is_terminal() {
+        eprintln!("the TUI needs an interactive terminal; use --once or --json");
+        return 2;
+    }
+    let indices: Vec<usize> = match cli.gpu {
+        Some(i) => vec![i],
+        None => {
+            let clock: Arc<dyn Clock> = Arc::new(SystemClock);
+            let (backends, _) = linux_backends_at(sys_root, proc_root, clock);
+            (0..list_adapters(&backends).len().max(1)).collect()
+        }
+    };
+    let budget = SCAN_BUDGET / u32::try_from(indices.len()).unwrap_or(1).max(1);
+    let mut sources: Vec<Box<dyn Source>> = Vec::new();
+    for index in indices {
+        let clock: Arc<dyn Clock> = Arc::new(SystemClock);
+        let (backends, notes) = linux_backends_at(sys_root, proc_root, clock.clone());
+        let deps = CollectorDeps {
+            backends,
+            procs: Box::new(LinuxProcs::new(proc_root.to_path_buf())),
+            http: Box::new(UreqGet::default()),
+            clock,
+            paths: Paths::from_env(),
+            notes,
+        };
+        match Collector::new(deps, index, ScanPolicy::Budgeted(budget)) {
+            Ok(c) => sources.push(Box::new(c)),
+            Err(e) => return usage_error(&e.to_string()),
+        }
+    }
+    let config = Config {
+        interval: Duration::from_secs_f64(cli.interval),
+    };
+    match gputaskman_tui::run(sources, config) {
+        Ok(()) => 0,
+        Err(e) => {
+            eprintln!("gputaskman: {e}");
+            1
+        }
     }
 }

@@ -1,0 +1,46 @@
+---
+source: crates/gputaskman-tui/tests/golden.rs
+expression: "screen(&render(&mut app, 140, 42))"
+---
+╭Full diagnostics──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ NVIDIA GeForce RTX 3060 Ti   driver 580.95  CUDA 13.0                                                                                    │
+│ VRAM ████████████████████████████████████████████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 10.00 GB / 16.00 GB                      │
+│      ■ LLM 8.00 GB  ■ compositor 2.00 GB  free 6.00 GB   shared(RAM) 1.00 GB                                                             │
+│ GPU 15%  Mem activity 30%  PCIe↓  N/A ↑ N/A MB/s                                                                                         │
+│ 37°C  26/200 W  P N/A  SM 390/2100 MHz  mem N/A MHz  video N/A MHz  PCIe genN/A xN/A  CC N/A                                             │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Charts  [All charts ▾]  Click to choose · c cycles                                                                                       │
+│ GPU               15% ▂                                             SM clock      390 MHz ▂                                              │
+│ VRAM              62% ▅                                             Mem activity      30% ▃                                              │
+│ Temperature      37°C ▃                                             Power            26 W ▂                                              │
+│ Encoder           N/A                                               Decoder           N/A                                                │
+│ Recent samples · blank = no reading · power 0–200 W · SM clock 0–2100 MHz                                                                │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+     PID Process                Kind        Runtime                    VRAM     Spill     Paged  GPU%   3D  Copy  Video What's inside       
+      10 llama-server           LLM                                 8.00 GB                                                                 
+      20 Xorg                   compositor                          2.00 GB                                             desktop back buffers
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+sort: VRAM  ·  top processes────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+╭llama-server (10) - LLM───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ VRAM 8.00 GB   spill(RAM) n/a   paged(est) n/a   engines idle                                                                            │
+│ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░                                     │
+│                                                                                                                                          │
+│ server llama-server http://127.0.0.1:8080                                                                                                │
+│ server --api-key private-test-value                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+q Quit  s Sort  c Chart  a All/Top  m Slim/Full  p Pause  ? Explain

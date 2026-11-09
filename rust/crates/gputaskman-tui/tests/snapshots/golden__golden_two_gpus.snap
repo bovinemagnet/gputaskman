@@ -1,0 +1,54 @@
+---
+source: crates/gputaskman-tui/tests/golden.rs
+expression: "screen(&render(&mut app, 140, 50))"
+---
+╭Full diagnostics──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ GPU 0                                                                                                                                    │
+│ NVIDIA GeForce RTX 3060 Ti   driver 580.95  CUDA 13.0                                                                                    │
+│ VRAM ████████████████████████████████████████████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 10.00 GB / 16.00 GB                      │
+│      ■ LLM 8.00 GB  ■ compositor 2.00 GB  free 6.00 GB   shared(RAM) 1.00 GB                                                             │
+│ GPU 15%  Mem activity 30%  PCIe↓  N/A ↑ N/A MB/s                                                                                         │
+│ 37°C  26/200 W  P N/A  SM 390/2100 MHz  mem N/A MHz  video N/A MHz  PCIe genN/A xN/A  CC N/A                                             │
+│ GPU 1                                                                                                                                    │
+│ GPU                                                                                                                                      │
+│ VRAM ████████████████████████████████████████████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 10.00 GB / 16.00 GB                      │
+│      ■ LLM 8.00 GB  ■ compositor 2.00 GB  free 6.00 GB   shared(RAM) 1.00 GB                                                             │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Charts  [All charts ▾]  Click to choose · c cycles                                                                                       │
+│ GPU 0                                                                                                                                    │
+│ GPU               15% ▂                                             SM clock      390 MHz ▂                                              │
+│ VRAM              62% ▅                                             Mem activity      30% ▃                                              │
+│ Temperature      37°C ▃                                             Power            26 W ▂                                              │
+│ Encoder           N/A                                               Decoder           N/A                                                │
+│ GPU 1                                                                                                                                    │
+│ GPU               N/A                                               SM clock          N/A                                                │
+│ VRAM              62% ▅                                             Mem activity      N/A                                                │
+│ Temperature       N/A                                               Power             N/A                                                │
+│ Encoder           N/A                                               Decoder           N/A                                                │
+│ GPU 0: Recent samples · blank = no reading · power 0–200 W · SM clock 0–2100 MHz                                                         │
+     PID Process                Kind        Runtime                    VRAM     Spill     Paged  GPU%   3D  Copy  Video What's inside    GPU
+      10 llama-server           LLM                                 8.00 GB                                                                0
+      10 llama-server           LLM                                 8.00 GB                                                                1
+      20 Xorg                   compositor                          2.00 GB                                             desktop back buf   0
+      20 Xorg                   compositor                          2.00 GB                                             desktop back buf   1
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+sort: VRAM  ·  top processes────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+╭llama-server (10) - LLM - GPU 0───────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ VRAM 8.00 GB   spill(RAM) n/a   paged(est) n/a   engines idle                                                                            │
+│ Model files, launch flags and runtime buffer logs can span GPUs. The breakdown below is not a measured per-device model placement.       │
+│ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░                                     │
+│                                                                                                                                          │
+│ server llama-server http://127.0.0.1:8080                                                                                                │
+│ server --api-key private-test-value                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+q Quit  s Sort  c Chart  a All/Top  m Slim/Full  p Pause  ? Explain

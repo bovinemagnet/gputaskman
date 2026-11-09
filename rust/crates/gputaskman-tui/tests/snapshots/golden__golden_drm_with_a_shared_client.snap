@@ -1,0 +1,46 @@
+---
+source: crates/gputaskman-tui/tests/golden.rs
+expression: "screen(&render(&mut app, 140, 42))"
+---
+╭Full diagnostics──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ AMD Radeon RX 9070                                                                                                                       │
+│ VRAM ████████████████████████████████████████████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 10.00 GB / 16.00 GB                      │
+│      ■ LLM 8.00 GB  ■ compositor 2.00 GB  free 6.00 GB   shared(RAM) 1.00 GB                                                             │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Charts  [All charts ▾]  Click to choose · c cycles                                                                                       │
+│ GPU               N/A                                               GFX clock         N/A                                                │
+│ VRAM              62% ▅                                             Mem activity      N/A                                                │
+│ Temperature       N/A                                               Power             N/A                                                │
+│ Encoder           N/A                                               Decoder           N/A                                                │
+│ Recent samples · blank = no reading · power 0–1 W · GFX clock 0–1 MHz                                                                    │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+     PID Process                Kind        Runtime                    VRAM     Spill     Paged  GPU%   3D  Copy  Video What's inside       
+      10 llama-server           LLM                                 8.00 GB                                                                 
+      20 Xorg                   compositor                          2.00 GB                                             desktop back buffers
+      30 firefox                browser                                 n/a       n/a                                   page textures, video
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+sort: VRAM  ·  top processes────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+╭firefox (30) - browser────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ VRAM n/a   spill(RAM) n/a   paged(est) n/a   engines idle                                                                                │
+│ VRAM and GPU% n/a: this process holds a DRM client other processes hold too (fd passing, fork). fdinfo counts the client once and        │
+│ doesn't say which of them uses it.                                                                                                       │
+│ Chromium GPU process: page tiles, images, video frames, canvas, WebGL/WebGPU buffers. Deeper: edge://gpu, or DevTools > Performance with │
+│ the GPU track.                                                                                                                           │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+q Quit  s Sort  c Chart  a All/Top  m Slim/Full  p Pause  ? Explain
