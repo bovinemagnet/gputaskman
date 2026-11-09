@@ -39,6 +39,8 @@ const SIDE_KINDS: &[&str] = &["vision projector", "LoRA adapter"];
 pub enum Origin {
     Local,
     Outside,
+    /// A Windows host row (WSL on the Windows port). Only read from v1 snapshots on Linux.
+    Windows,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -70,6 +72,7 @@ impl ProcRow {
         match self.origin {
             Origin::Local => self.pid.to_string(),
             Origin::Outside => format!("o{}", self.pid),
+            Origin::Windows => format!("w{}", self.pid),
         }
     }
 
@@ -77,6 +80,7 @@ impl ProcRow {
         match self.origin {
             Origin::Local => self.pid.to_string(),
             Origin::Outside => format!("H:{}", self.pid),
+            Origin::Windows => format!("W:{}", self.pid),
         }
     }
 

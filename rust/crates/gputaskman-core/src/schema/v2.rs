@@ -115,7 +115,8 @@ pub struct LlmV2 {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ProcessV2 {
-    pub pid: Pid,
+    /// `None` only when read from a v1 document that has no pid: unknown is not zero.
+    pub pid: Option<Pid>,
     pub origin: Origin,
     pub name: String,
     pub kind: String,
@@ -268,7 +269,7 @@ fn resident(row: &ProcRow, backend: Option<BackendKind>) -> Option<ResidentV2> {
             gtt: Bytes::unavailable(Reason::OutsideNamespace),
         })),
         Origin::Local if backend == Some(BackendKind::Drm) => row.gpu.resident.map(from),
-        Origin::Local => None,
+        Origin::Local | Origin::Windows => None,
     }
 }
 
@@ -280,7 +281,7 @@ fn process(row: &ProcRow, backend: Option<BackendKind>) -> ProcessV2 {
         _ => not_on_backend,
     };
     ProcessV2 {
-        pid: row.pid,
+        pid: Some(row.pid),
         origin: row.origin,
         name: row.name.clone(),
         kind: row.kind.clone(),
