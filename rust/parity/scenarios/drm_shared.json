@@ -1,0 +1,45 @@
+{
+  "kind": "drm",
+  "cards": [
+    {"name": "card1", "pdev": "0000:03:00.0", "vendor": 4098, "device": 30032, "vram": 17179869184, "apu": false}
+  ],
+  "samples": [
+    [
+      {"pid": 200, "start": 6000, "fds": [
+        {"fd": 5, "target": "/dev/dri/renderD128",
+         "fdinfo": {"client": 30, "gfx": 2000000000, "vram": 512, "gtt": 64}}
+      ]},
+      {"pid": 201, "start": 6001, "fds": [
+        {"fd": 5, "target": "/dev/dri/renderD128",
+         "fdinfo": {"client": 30, "gfx": 2000000000, "vram": 512, "gtt": 64}}
+      ]},
+      {"pid": 300, "start": 7000, "fds": [
+        {"fd": 8, "target": "/dev/dri/renderD128",
+         "fdinfo": {"client": 31, "gfx": 100000000, "vram": 2048, "gtt": 16, "shared_vram": 64}}
+      ]},
+      {"pid": 400, "start": 8000, "fds": [
+        {"fd": 3, "target": "/dev/dri/card1",
+         "fdinfo": {"client": 32, "gfx": 0, "vram": 128, "gtt": 0}}
+      ]}
+    ],
+    [
+      {"pid": 200, "start": 6000, "fds": [
+        {"fd": 5, "target": "/dev/dri/renderD128",
+         "fdinfo": {"client": 30, "gfx": 2250000000, "vram": 512, "gtt": 64}}
+      ]},
+      {"pid": 201, "start": 6001, "fds": [
+        {"fd": 5, "target": "/dev/dri/renderD128",
+         "fdinfo": {"client": 30, "gfx": 2250000000, "vram": 512, "gtt": 64}}
+      ]},
+      {"pid": 300, "start": 7000, "fds": [
+        {"fd": 8, "target": "/dev/dri/renderD128",
+         "fdinfo": {"client": 31, "gfx": 350000000, "vram": 2048, "gtt": 16, "shared_vram": 64}}
+      ]},
+      {"pid": 400, "start": 8000, "fds": [
+        {"fd": 3, "target": "/dev/dri/card1",
+         "fdinfo": {"client": 32, "gfx": 100000000, "vram": 128, "gtt": 0}}
+      ]}
+    ]
+  ],
+  "advance_ms": 1000
+}

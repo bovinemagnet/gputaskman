@@ -1,0 +1,13 @@
+error[E0308]: mismatched types
+ --> tests/ui/sum_shown.rs:2:58
+  |
+2 | fn f(s: Shown) { let mut t = MeasuredTotal::new(); t.add(s); }
+  |                                                      --- ^ expected `Measured`, found `Shown`
+  |                                                      |
+  |                                                      arguments to this method are incorrect
+  |
+note: method defined here
+ --> src/provenance.rs
+  |
+  |     pub fn add(&mut self, m: Measured) {
+  |            ^^^

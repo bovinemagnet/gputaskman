@@ -1,0 +1,13 @@
+error[E0369]: cannot add `Resident` to `Resident`
+ --> tests/ui/add_resident.rs:2:44
+  |
+2 | fn f(a: Resident, b: Resident) { let _ = a + b; }
+  |                                          - ^ - Resident
+  |                                          |
+  |                                          Resident
+  |
+note: `Resident` does not implement `Add`
+ --> src/provenance.rs
+  |
+  | pub struct Resident {
+  | ^^^^^^^^^^^^^^^^^^^ `Resident` is defined in another crate
