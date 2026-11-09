@@ -59,7 +59,7 @@ impl From<std::io::Error> for TuiError {
 /// Runs the TUI until the user quits. `sources` are one collector per GPU, in GPU order.
 pub fn run(sources: Vec<Box<dyn Source>>, config: Config) -> Result<(), TuiError> {
     let paused = Arc::new(AtomicBool::new(false));
-    let (sampler, rx) = Sampler::spawn(sources, config.interval, WARMUP, Arc::clone(&paused));
+    let (sampler, rx) = Sampler::spawn(sources, config.interval, WARMUP, Arc::clone(&paused))?;
     let (guard, mut terminal) = terminal::TerminalGuard::enter()?;
     let result = event_loop(&mut terminal, &rx, &paused);
     drop(guard); // the terminal is normal again before anything is reported

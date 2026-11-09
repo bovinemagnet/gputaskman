@@ -18,6 +18,9 @@ impl Source for Collector {
     }
 }
 
+/// The sampler thread's name; the panic hook keys on it.
+pub const THREAD_NAME: &str = "gputaskman-sampler";
+
 pub struct Sampler {
     stop: Option<Sender<()>>,
     handle: Option<JoinHandle<()>>,
@@ -34,32 +37,34 @@ impl Sampler {
         interval: Duration,
         warmup: Duration,
         paused: Arc<AtomicBool>,
-    ) -> (Sampler, Receiver<Vec<Snapshot>>) {
+    ) -> std::io::Result<(Sampler, Receiver<Vec<Snapshot>>)> {
         let (tx, rx) = mpsc::channel();
         let (stop_tx, stop_rx) = mpsc::channel::<()>();
-        let handle = std::thread::spawn(move || {
-            if stop_requested(&stop_rx, warmup) {
-                return;
-            }
-            loop {
-                if !paused.load(Ordering::Relaxed) {
-                    let snaps: Vec<Snapshot> = sources.iter_mut().map(|s| s.sample()).collect();
-                    if tx.send(snaps).is_err() {
+        let handle = std::thread::Builder::new()
+            .name(THREAD_NAME.into())
+            .spawn(move || {
+                if stop_requested(&stop_rx, warmup) {
+                    return;
+                }
+                loop {
+                    if !paused.load(Ordering::Relaxed) {
+                        let snaps: Vec<Snapshot> = sources.iter_mut().map(|s| s.sample()).collect();
+                        if tx.send(snaps).is_err() {
+                            return;
+                        }
+                    }
+                    if stop_requested(&stop_rx, interval) {
                         return;
                     }
                 }
-                if stop_requested(&stop_rx, interval) {
-                    return;
-                }
-            }
-        });
-        (
+            })?;
+        Ok((
             Sampler {
                 stop: Some(stop_tx),
                 handle: Some(handle),
             },
             rx,
-        )
+        ))
     }
 
     /// Stops the thread and waits for it; `Err` carries a panic's message.

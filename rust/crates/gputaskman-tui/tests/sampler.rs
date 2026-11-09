@@ -52,7 +52,8 @@ fn the_sampler_collects_every_gpu_and_drops_each_collector() {
         TICK,
         Duration::ZERO,
         Arc::new(AtomicBool::new(false)),
-    );
+    )
+    .unwrap();
     let first = rx.recv_timeout(Duration::from_secs(2)).unwrap();
     assert_eq!(first.len(), 2);
     let started = Instant::now();
@@ -65,7 +66,7 @@ fn the_sampler_collects_every_gpu_and_drops_each_collector() {
 fn nothing_is_sampled_while_paused() {
     let (sources, calls, _) = fakes(1, false);
     let paused = Arc::new(AtomicBool::new(true));
-    let (sampler, rx) = Sampler::spawn(sources, TICK, Duration::ZERO, Arc::clone(&paused));
+    let (sampler, rx) = Sampler::spawn(sources, TICK, Duration::ZERO, Arc::clone(&paused)).unwrap();
     std::thread::sleep(TICK * 5);
     assert_eq!(calls.load(Ordering::SeqCst), 0);
     assert!(rx.try_recv().is_err());
@@ -82,7 +83,8 @@ fn the_first_sample_waits_for_the_warmup() {
         TICK,
         Duration::from_millis(300),
         Arc::new(AtomicBool::new(false)),
-    );
+    )
+    .unwrap();
     std::thread::sleep(Duration::from_millis(100));
     assert_eq!(calls.load(Ordering::SeqCst), 0);
     drop(sampler);
@@ -96,7 +98,8 @@ fn a_panicking_collector_disconnects_and_reports_its_message() {
         TICK,
         Duration::ZERO,
         Arc::new(AtomicBool::new(false)),
-    );
+    )
+    .unwrap();
     assert!(rx.recv_timeout(Duration::from_secs(2)).is_err());
     let err = sampler.join().unwrap_err();
     assert!(err.contains("collector failed"), "{err}");
