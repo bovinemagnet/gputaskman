@@ -45,6 +45,7 @@ pub use fake::FakeNvml;
 #[cfg(any(test, feature = "test-support"))]
 mod fake {
     use super::*;
+    use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::{Arc, Mutex};
 
     #[derive(Debug, Clone, Default)]
@@ -65,6 +66,7 @@ mod fake {
         devices: Vec<FakeDevice>,
         count_fails: bool,
         util_calls: Arc<Mutex<Vec<u64>>>,
+        memory_fails: Arc<AtomicBool>,
     }
 
     impl FakeNvml {
@@ -101,6 +103,12 @@ mod fake {
         /// Every read of this device fails, as for a GPU that fell off the bus.
         pub fn fail_handle(self, i: usize) -> Self {
             self.with(i, |d| d.failing = true)
+        }
+
+        /// While the returned flag is set, every memory read fails and the process lists still
+        /// answer, as for a read that fails after the adapters were listed.
+        pub fn memory_fails_handle(&self) -> Arc<AtomicBool> {
+            Arc::clone(&self.memory_fails)
         }
 
         /// `device_count` fails.
@@ -145,7 +153,11 @@ mod fake {
             self.dev(i).map(|d| d.name.clone())
         }
         fn memory(&self, i: u32) -> Result<(u64, u64), String> {
-            self.dev(i).map(|d| (d.total, d.used))
+            let d = self.dev(i)?;
+            if self.memory_fails.load(Ordering::Relaxed) {
+                return Err("NVML_ERROR_UNKNOWN".to_string());
+            }
+            Ok((d.total, d.used))
         }
         fn compute_processes(&self, i: u32) -> Result<Vec<NvProcess>, String> {
             self.dev(i).map(|d| d.compute.clone())

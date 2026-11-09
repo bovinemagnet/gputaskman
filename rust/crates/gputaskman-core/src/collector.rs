@@ -32,6 +32,8 @@ pub const SCAN_BUDGET: Duration = Duration::from_millis(150);
 
 const OUTSIDE_NAME: &str = "(outside this container)";
 const SIDE_KINDS: &[&str] = &["vision projector", "LoRA adapter"];
+/// The reason a snapshot without an adapter gives, whatever the backends said.
+const NO_GPU_NOTE: &str = "no supported GPU found (NVIDIA through NVML, or an amdgpu card)";
 
 /// Where a row's PID comes from. An outside PID is from another PID namespace and never a local one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -328,6 +330,9 @@ impl Collector {
             notes: self.notes.clone(),
         };
         let (Some(backend), Some(adapter)) = (self.backend.as_mut(), self.adapter.as_ref()) else {
+            if !snap.notes.iter().any(|n| n == NO_GPU_NOTE) {
+                snap.notes.push(NO_GPU_NOTE.to_string());
+            }
             return snap;
         };
         let sample = backend.sample();

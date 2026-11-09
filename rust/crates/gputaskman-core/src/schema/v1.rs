@@ -355,14 +355,17 @@ pub fn from_v1(v: &Value) -> Result<SnapshotV2, String> {
         driver: nonempty(v, "driver"),
         cuda: nonempty(v, "cuda"),
         memory: MemoryV2 {
-            total: measured_or_unknown(v, "vram_total"),
+            // Python writes `or 0` for an unknown total; a real adapter never has zero VRAM.
+            total: uint(v, "vram_total")
+                .filter(|t| *t > 0)
+                .map_or(Bytes::unavailable(Reason::V1Unknown), Bytes::measured),
             used: measured_or_unknown(v, "vram_used"),
             shared_used: measured_or_unknown(v, "shared_used"),
             attributed: measured_or_unknown(v, "attributed"),
             shared_is_spill: v
                 .get("shared_is_spill")
                 .and_then(Value::as_bool)
-                .unwrap_or(false),
+                .unwrap_or(true), // Python's default
         },
         status: StatusV2 {
             process: nonempty(v, "process_status"),

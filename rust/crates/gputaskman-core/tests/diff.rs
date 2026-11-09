@@ -468,3 +468,22 @@ fn schema_version_absent_is_v1_two_is_v2_anything_else_errors() {
     data["schema_version"] = json!(1);
     assert!(load(&write_encoded(&dir, "c.json", &data, "utf-8")).is_err());
 }
+
+#[test]
+fn huge_segment_sums_saturate_instead_of_overflowing() {
+    let huge = 1u64 << 63;
+    let view = json!({"n_ctx": 4096, "segments": [
+        {"label": "a", "bytes": huge, "kind": "weights", "exact": true},
+        {"label": "b", "bytes": huge, "kind": "weights", "exact": true}]});
+    let s = snap(vec![with_llm(proc(Some(1), "llama"), view)], None, None);
+    let d = diff(&v2(&s), &v2(&s)).unwrap();
+    let weights = d.processes[0]
+        .runtime
+        .as_ref()
+        .unwrap()
+        .segments
+        .get("weights")
+        .unwrap()
+        .change;
+    assert_eq!(weights.after, Some(i64::MAX));
+}

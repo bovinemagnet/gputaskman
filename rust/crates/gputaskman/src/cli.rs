@@ -1,4 +1,5 @@
 //! Argument handling and the one-shot flow, mirroring the Python `cli.py`.
+use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -59,6 +60,20 @@ fn usage_error(message: &str) -> i32 {
         .exit()
 }
 
+/// Writes `text` and a newline to stdout. A closed pipe (`gputaskman --json | head -1`) is a clean
+/// exit (0); any other write error is reported on stderr (1). Never panics.
+fn emit(text: &str) -> i32 {
+    let mut out = std::io::stdout().lock();
+    match writeln!(out, "{text}").and_then(|()| out.flush()) {
+        Ok(()) => 0,
+        Err(e) if e.kind() == std::io::ErrorKind::BrokenPipe => 0,
+        Err(e) => {
+            let _ = writeln!(std::io::stderr(), "gputaskman: cannot write to stdout: {e}");
+            1
+        }
+    }
+}
+
 pub fn run() -> i32 {
     let cli = Cli::parse();
     if let Some(Command::Diff {
@@ -82,10 +97,15 @@ pub fn run() -> i32 {
     let (backends, notes) = linux_backends_at(&sys_root, &proc_root, clock.clone());
 
     if cli.list_gpus {
-        for (i, a) in list_adapters(&backends).iter().enumerate() {
-            println!("{i}: {} ({}, key 0x{:016x})", a.name, a.vendor(), a.key);
+        let lines: Vec<String> = list_adapters(&backends)
+            .iter()
+            .enumerate()
+            .map(|(i, a)| format!("{i}: {} ({}, key 0x{:016x})", a.name, a.vendor(), a.key))
+            .collect();
+        if lines.is_empty() {
+            return 0;
         }
-        return 0;
+        return emit(&lines.join("\n"));
     }
 
     if !(cli.once || cli.json) {
@@ -109,11 +129,10 @@ pub fn run() -> i32 {
     std::thread::sleep(Duration::from_secs(1)); // engine utilisation is a rate; needs two samples
     let snapshot = collector.sample();
     if cli.json {
-        println!("{}", schema::v2::to_json(&snapshot));
+        emit(&schema::v2::to_json(&snapshot))
     } else {
-        println!("{}", report::to_text(&snapshot, 30));
+        emit(&report::to_text(&snapshot, 30))
     }
-    0
 }
 
 fn diff_main(before: &std::path::Path, after: &std::path::Path, json: bool) -> i32 {
@@ -122,16 +141,10 @@ fn diff_main(before: &std::path::Path, after: &std::path::Path, json: bool) -> i
         .and_then(|(b, a)| diff::diff(&b, &a));
     match result {
         Ok(d) if json => match serde_json::to_string_pretty(&d) {
-            Ok(s) => {
-                println!("{s}");
-                0
-            }
+            Ok(s) => emit(&s),
             Err(e) => usage_error(&e.to_string()),
         },
-        Ok(d) => {
-            println!("{}", diff::to_text(&d));
-            0
-        }
+        Ok(d) => emit(&diff::to_text(&d)),
         Err(e) => usage_error(&e),
     }
 }

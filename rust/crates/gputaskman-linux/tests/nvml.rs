@@ -59,6 +59,22 @@ fn native_linux_attributes_vram_and_engines_per_pid() {
 }
 
 #[test]
+fn failed_adapter_memory_read_is_unreadable_not_absent() {
+    let fake = FakeNvml::default()
+        .device(BUS, "NVIDIA GeForce RTX 3090 Ti", 24 * GIB, 4 * GIB)
+        .compute(0, vec![p(100, Some(3 * GIB))]);
+    let memory_fails = fake.memory_fails_handle();
+    let mut b = backend(fake);
+    memory_fails.store(true, std::sync::atomic::Ordering::Relaxed);
+    let sample = b.sample();
+    assert_eq!(
+        sample.adapter.vram_used,
+        Bytes::unavailable(Reason::Unreadable)
+    );
+    assert_eq!(sample.procs[&100].vram, Bytes::measured(3 * GIB));
+}
+
+#[test]
 fn hidden_per_process_memory_is_unknown_not_zero() {
     let fake = FakeNvml::default()
         .device(BUS, "GPU", 24 * GIB, GIB)

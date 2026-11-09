@@ -36,9 +36,10 @@ jobs:
         working-directory: rust
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      # Pinned to rust/rust-toolchain.toml: the trybuild .stderr snapshots depend on the compiler.
+      - uses: dtolnay/rust-toolchain@1.97.0
         with:
-          components: clippy
+          components: clippy, rustfmt
       - name: Test core (all platforms)
         run: cargo test -p gputaskman-core
       - name: Test Linux crate and CLI

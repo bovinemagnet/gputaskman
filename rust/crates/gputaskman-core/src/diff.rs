@@ -301,7 +301,8 @@ fn segments(p: Option<&ProcessV2>) -> Sums {
             .bytes
             .value()
             .map_or(0, |v| i64::try_from(v).unwrap_or(i64::MAX));
-        *sums.entry(k).or_insert(0i64) += bytes;
+        let sum = sums.entry(k).or_insert(0i64);
+        *sum = sum.saturating_add(bytes);
         let was = exact.get(k).copied().unwrap_or(true);
         exact.insert(
             k,

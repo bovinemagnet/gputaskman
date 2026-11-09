@@ -7,7 +7,8 @@ Rust side is wrong unless the Python behaviour breaks one of the provenance rule
 
 ## Build and run
 
-Requires Rust 1.97 or later.
+Requires Rust 1.97 or later. `rust-toolchain.toml` pins 1.97.0, the compiler the compile-fail
+(`trybuild`) snapshots were generated with; rustup installs it on first use in `rust/`.
 
 ```sh
 cd rust
@@ -21,12 +22,16 @@ target/release/gputaskman diff before.json after.json
 `diff` reads both Rust (schema v2) and Python (v1) `--json` files. The interactive TUI is not
 ported yet: without `--once` or `--json` the command prints a message and exits.
 
+`GPUTASKMAN_PROC_ROOT` and `GPUTASKMAN_SYS_ROOT` replace `/proc` and `/sys`. They exist for tests,
+which point them at fixture trees; they are not a supported way to inspect another machine.
+
 ## Status
 
 - **Milestone 1.** The collector, both Linux backends, the text report, JSON output and `diff`.
 - **Native Linux only.** NVML for NVIDIA GPUs and DRM fdinfo for amdgpu cards. WSL, Windows and
-  macOS are not supported; the platform-neutral `gputaskman-core` crate builds and is tested on all
-  three operating systems.
+  macOS are not supported; under WSL the command collects nothing and says why in a note. CI is
+  configured to test the platform-neutral `gputaskman-core` crate on Linux, Windows and macOS, but
+  has not run yet (workflows are not yet enabled on the fork), so only Linux has been checked.
 - **JSON schema v2 is unstable.** Field names and shapes may still change. Every number carries its
   provenance (`measured`, `inferred`, `estimated`, `reported` or `unavailable` with a reason).
 
@@ -47,6 +52,12 @@ Crates:
 | Reason code `unreadable` for an amdgpu sysfs counter that exists but cannot be read | Python has no reason codes outside DRM attribution; rule 9 wants the reason |
 | Schema v2 has a top-level `notes` array and `status.device` | Rule 9: degradation reasons (a vendor library that did not load, unreadable device telemetry) must reach the JSON as well as the text |
 | Rows with unknown VRAM sort as 0 with a stable sort | The same order as Python's `-(shown_vram or 0)`; recorded because the design first placed unknown rows last |
+| Local API probes never follow redirects | Rule 6: a redirect could send the `GET` to another host or port; Python's `urllib` follows them |
+| A non-positive `n_ctx` produces no KV segment | A negative context is not a size; Python multiplies it through and can show a negative KV estimate |
+| An NVML PID hidden (no usage) in one process list and measured in the other is unknown as a whole | Rule 2: part of its memory is unknown. Python counts the measured part in `attributed` although no row shows it |
+| Unknown `vram_total` prints `N/A` in the text report | Rule 2; Python prints `0 MB` |
+| A v1 inferred row without `vram_inferred_by` reads as an order guess (`?`) | Rule 5: without the confidence, `*` cannot be claimed |
+| WSL is refused with a note and no GPU data | NVML under WSL reports Windows host PIDs, which would be charged to the wrong processes; WSL support is later work |
 
 ## Validation
 

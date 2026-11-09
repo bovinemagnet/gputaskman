@@ -186,10 +186,16 @@ impl GpuBackend for NvmlBackend {
         let Some(index) = self.selected else {
             return BackendSample::default();
         };
-        let mut adapter = AdapterGpu::default();
-        if let Ok((_, used)) = self.api.memory(index) {
-            adapter.vram_used = Bytes::measured(used);
-        }
+        // NVML offers adapter memory, so a failed read is unreadable, not absent from the backend.
+        let adapter = AdapterGpu {
+            vram_used: self
+                .api
+                .memory(index)
+                .map_or(Bytes::unavailable(Reason::Unreadable), |(_, used)| {
+                    Bytes::measured(used)
+                }),
+            ..AdapterGpu::default()
+        };
         let compute = self.api.compute_processes(index).unwrap_or_default();
         let graphics = self.api.graphics_processes(index).unwrap_or_default();
         let compute_pids: BTreeSet<u32> = compute.iter().map(|p| p.pid).collect();

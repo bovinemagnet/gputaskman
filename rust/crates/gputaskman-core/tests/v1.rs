@@ -94,3 +94,23 @@ fn resident_matches_what_from_snapshot_emits() {
         assert!(!o.summable);
     }
 }
+
+#[test]
+fn missing_shared_is_spill_defaults_to_true_as_in_python() {
+    let s = from_v1(&json!({"processes": []})).unwrap();
+    assert!(s.memory.shared_is_spill);
+    let s = from_v1(&json!({"shared_is_spill": false, "processes": []})).unwrap();
+    assert!(!s.memory.shared_is_spill);
+}
+
+#[test]
+fn zero_vram_total_is_unknown_and_positive_stays_measured() {
+    // Python writes `vram_total ... or 0` when the total is unknown.
+    let s = from_v1(&json!({"vram_total": 0, "processes": []})).unwrap();
+    assert_eq!(s.memory.total, Bytes::unavailable(Reason::V1Unknown));
+    let s = from_v1(&json!({"vram_total": 1, "processes": []})).unwrap();
+    assert_eq!(s.memory.total, Bytes::measured(1));
+    // Other counters keep a measured zero.
+    let s = from_v1(&json!({"vram_used": 0, "processes": []})).unwrap();
+    assert_eq!(s.memory.used, Bytes::measured(0));
+}

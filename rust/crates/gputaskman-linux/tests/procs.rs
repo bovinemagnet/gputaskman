@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 use gputaskman_core::traits::{Clock, ProcessSource, SystemClock};
-use gputaskman_linux::linux_backends;
 use gputaskman_linux::procs::LinuxProcs;
+use gputaskman_linux::{linux_backends, linux_backends_at};
 use std::os::unix::fs::symlink;
 use std::sync::Arc;
 
@@ -109,6 +109,31 @@ fn smaps_entries_without_a_path_are_skipped() {
 fn linux_backends_does_not_panic_without_drivers() {
     let clock: Arc<dyn Clock> = Arc::new(SystemClock);
     let (_backends, _notes) = linux_backends(clock);
+}
+
+#[test]
+fn wsl_is_refused_with_a_note_and_no_backends() {
+    let dir = tempfile::tempdir().unwrap();
+    let proc_root = dir.path().join("proc");
+    std::fs::create_dir_all(proc_root.join("sys/kernel")).unwrap();
+    std::fs::write(
+        proc_root.join("sys/kernel/osrelease"),
+        "6.6.87.2-microsoft-standard-WSL2\n",
+    )
+    .unwrap();
+    let sys_root = dir.path().join("sys");
+    std::fs::create_dir_all(sys_root.join("class/drm")).unwrap();
+    let clock: Arc<dyn Clock> = Arc::new(SystemClock);
+    let (backends, notes) = linux_backends_at(&sys_root, &proc_root, clock);
+    assert!(backends.is_empty());
+    assert_eq!(
+        notes,
+        vec![
+            "WSL is not supported by the Rust build yet (milestone 1 is native Linux); \
+             no GPU data is collected"
+                .to_string()
+        ]
+    );
 }
 
 #[test]

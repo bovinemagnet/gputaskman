@@ -88,6 +88,20 @@ fn json_without_a_supported_gpu_is_valid_v2() {
         assert!(v["adapter"].is_null());
         assert!(v["processes"].as_array().unwrap().is_empty());
     }
+    if v["adapter"].is_null() {
+        let notes: Vec<&str> = v["notes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(serde_json::Value::as_str)
+            .collect();
+        let reason = "no supported GPU found (NVIDIA through NVML, or an amdgpu card)";
+        assert_eq!(
+            notes.iter().filter(|n| **n == reason).count(),
+            1,
+            "{notes:?}"
+        );
+    }
 }
 
 #[test]
@@ -141,4 +155,26 @@ fn diff_text_json_and_errors() {
         .arg(dir.path().join("missing.json"))
         .assert()
         .code(2);
+}
+
+#[test]
+fn closed_stdout_pipe_exits_cleanly_without_a_panic() {
+    let dir = tempfile::tempdir().unwrap();
+    let base = cmd(dir.path());
+    let mut child = std::process::Command::new(base.get_program())
+        .envs(
+            base.get_envs()
+                .filter_map(|(k, v)| v.map(|v| (k.to_owned(), v.to_owned()))),
+        )
+        .arg("--json")
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    // Close the reading end before the snapshot is written (collection waits a second first).
+    drop(child.stdout.take());
+    let out = child.wait_with_output().unwrap();
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(!stderr.contains("panicked"), "stderr: {stderr}");
+    assert_eq!(out.status.code(), Some(0), "stderr: {stderr}");
 }

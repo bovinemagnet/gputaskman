@@ -306,9 +306,31 @@ fn no_supported_gpu_gives_an_empty_snapshot_with_a_reason() {
     assert!(matches!(snap.vram_total, Bytes::Unavailable { .. }));
     assert_eq!(
         snap.notes,
-        vec!["NVML not loaded: libnvidia-ml.so not found"]
+        vec![
+            "NVML not loaded: libnvidia-ml.so not found",
+            "no supported GPU found (NVIDIA through NVML, or an amdgpu card)"
+        ]
     );
     assert_eq!(snap.backend, None);
+}
+
+#[test]
+fn no_supported_gpu_is_explained_even_when_every_backend_loaded() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut c = Collector::new(
+        deps(vec![], FakeProcs::default(), dir.path()),
+        0,
+        ScanPolicy::Unbounded,
+    )
+    .unwrap();
+    let first = c.sample();
+    let second = c.sample();
+    let want = vec!["no supported GPU found (NVIDIA through NVML, or an amdgpu card)"];
+    assert_eq!(first.notes, want);
+    assert_eq!(
+        second.notes, want,
+        "the note is not repeated across samples"
+    );
 }
 
 #[test]
