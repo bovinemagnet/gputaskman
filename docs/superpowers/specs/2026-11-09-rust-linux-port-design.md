@@ -188,12 +188,13 @@ Top level:
     "attributed":  {"status": "measured", "bytes": 3221225472},
     "shared_is_spill": true
   },
-  "status": {"process": null, "counter": null, "host": null, "wsl_split": null},
+  "status": {"process": null, "device": null, "counter": null, "host": null, "wsl_split": null},
   "device": { "…DeviceTelemetry fields, each null when unread…": null },
   "processes": [ … ]
 }
 ```
 
+`status.device` is the reason code when device telemetry could not be read, else `null`.
 `memory.attributed` is `unavailable` with a reason whenever any row's VRAM is unavailable,
 matching Python's `Snapshot.attributed` returning `None`.
 
