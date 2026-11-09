@@ -2,4 +2,5 @@
 #[cfg(feature = "test-support")]
 pub mod fixtures;
 pub mod format;
+pub mod history;
 pub mod widgets;
