@@ -100,7 +100,8 @@ pub enum Confidence { Consistent, Order }          // renders "*" and "?"
 - `Reason` is a closed enum of stable string codes. The DRM codes reuse Python's values: `legacy`,
   `shared_client`, `shared_buffers`, `primary`, `incomplete`, `partial_scan`. New codes include
   `nvml_not_loaded`, `nvml_hidden`, `process_unreadable`, `not_on_backend`, `outside_namespace`,
-  `kfd_untimed`, `no_baseline`, `torn_counter` and `v1_unknown`.
+  `kfd_untimed`, `no_baseline`, `torn_counter`, `unreadable` and `v1_unknown`. `not_on_backend` means
+  the backend never offers the field; `unreadable` means it does but the read failed.
 
 Other core types mirror the Python data model: `Adapter` (keyed by PCI bus ID on Linux, never name
 or index), `DeviceTelemetry` (every reading `Option`), `ProcRow`, `ProcDetail`, `MappedModel`,
