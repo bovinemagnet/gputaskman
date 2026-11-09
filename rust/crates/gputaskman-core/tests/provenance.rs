@@ -84,12 +84,14 @@ fn reason_codes_match_python() {
         (Reason::PartialScan, "partial_scan"),
         (Reason::NvmlHidden, "nvml_hidden"),
         (Reason::V1Unknown, "v1_unknown"),
+        (Reason::Unreadable, "unreadable"),
     ];
     for (reason, code) in codes {
         assert_eq!(reason.code(), code);
     }
     assert!(!Reason::NvmlHidden.voids_attribution());
     assert!(Reason::SharedBuffers.voids_attribution());
+    assert!(Reason::Unreadable.voids_attribution());
 }
 
 #[test]

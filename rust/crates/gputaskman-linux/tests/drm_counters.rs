@@ -73,20 +73,51 @@ fn private_render_client_is_measured_and_engine_load_needs_two_samples() {
 
 #[test]
 fn any_shared_buffer_leaves_the_process_unattributed() {
-    let (dir, mut counters, _clock, key) = setup();
-    let p = dir.path().join("proc");
-    write_fd(
-        &p,
-        100,
-        5,
-        &fdinfo(1, PDEV, 0, 1024, 0, 4, 0, 0),
-        "/dev/dri/renderD128",
-    );
-    write_stat(&p, 100, 1);
-    let (procs, _) = counters.sample();
-    let g = &procs[&key][&100];
-    assert_eq!(g.vram, Bytes::unavailable(Reason::SharedBuffers));
-    assert_eq!(g.resident.unwrap().vram, Bytes::measured(1024 * 1024)); // reference only
+    // drm-shared-* counts by preferred placement and drm-resident-* by current placement, so
+    // resident minus shared is not this process's private memory. Any sharing at all: n/a, never
+    // a subtraction. Cases: (vram, gtt, shared vram, shared gtt, shared cpu), in KiB.
+    for (vram, gtt, sv, sg, sc) in [
+        (1024, 0, 4, 0, 0),
+        (3, 10, 2, 0, 0),
+        (3, 10, 0, 4, 0),
+        (3, 10, 0, 0, 6),
+    ] {
+        let (dir, mut counters, clock, key) = setup();
+        let p = dir.path().join("proc");
+        write_fd(
+            &p,
+            100,
+            5,
+            &fdinfo(1, PDEV, 0, vram, gtt, sv, sg, sc),
+            "/dev/dri/renderD128",
+        );
+        write_stat(&p, 100, 1);
+        counters.sample(); // engine baseline
+        clock.advance(Duration::from_secs(1));
+        let (procs, _) = counters.sample();
+        let g = &procs[&key][&100];
+        let case = (sv, sg, sc);
+        assert_eq!(
+            g.vram,
+            Bytes::unavailable(Reason::SharedBuffers),
+            "{case:?}"
+        );
+        assert_eq!(
+            g.shared,
+            Bytes::unavailable(Reason::SharedBuffers),
+            "{case:?}"
+        );
+        assert_eq!(g.shown_vram(), None, "{case:?}");
+        let resident = g.resident.unwrap(); // reference only
+        assert_eq!(resident.vram, Bytes::measured(vram * 1024), "{case:?}");
+        assert_eq!(resident.gtt, Bytes::measured(gtt * 1024), "{case:?}");
+        // Sharing buffers doesn't share the client's engine time.
+        assert!(
+            matches!(g.engines, Engines::Measured { .. }),
+            "{case:?}: {:?}",
+            g.engines
+        );
+    }
 }
 
 #[test]
@@ -187,7 +218,9 @@ fn scan_setup(tmp: &Path) -> (DrmCard, PathBuf) {
     (c, proc_root)
 }
 
-/// The Python budget tests' `timer`, which moves one second on every call.
+/// The Python budget tests' `timer`, which moves one second on every call. Unlike Python, the
+/// budget tests share this one clock with the fdinfo read times, so the number of fdinfo reads
+/// in a refresh affects which pid is deferred.
 fn ticking() -> Arc<FakeClock> {
     Arc::new(FakeClock::new(0.0).auto_advance(Duration::from_secs(1)))
 }
@@ -362,6 +395,20 @@ fn test_unparseable_memory_is_unknown() {
 }
 
 #[test]
+fn test_torn_engine_counter_is_unknown() {
+    let text = fdi(7, 0, 0).replace("drm-engine-gfx:\t0 ns", "drm-engine-gfx:\t");
+    let tmp = tempfile::tempdir().unwrap();
+    let mut e = edge(tmp.path(), &[(100, 5, text, RENDER)], false, true);
+    let g = e.counters.sample().0[&e.card.key][&100].clone();
+    assert_eq!(
+        g.engines,
+        Engines::Unavailable {
+            reason: Reason::TornCounter
+        }
+    );
+}
+
+#[test]
 fn test_engine_counter_stepping_back_is_not_counted_twice() {
     let tmp = tempfile::tempdir().unwrap();
     let mut e = edge(
@@ -401,8 +448,8 @@ fn test_missing_sysfs_memory_is_unknown() {
     let tmp = tempfile::tempdir().unwrap();
     let mut e = edge(tmp.path(), &[], false, false);
     let a = e.counters.sample().1[&e.card.key];
-    assert_eq!(a.vram_used, Bytes::unavailable(Reason::NotOnBackend));
-    assert_eq!(a.shared_used, Bytes::unavailable(Reason::NotOnBackend));
+    assert_eq!(a.vram_used, Bytes::unavailable(Reason::Unreadable));
+    assert_eq!(a.shared_used, Bytes::unavailable(Reason::Unreadable));
     assert_eq!(read_device(&e.card, 0, "6.1.0").mem_used, None);
 }
 
@@ -539,8 +586,10 @@ fn test_unreadable_fd_after_listing_is_incomplete() {
         eprintln!("skipped: permission bits don't apply to root");
         return;
     }
-    // Python fails one readlink. Linux checks only the directory's search bit for readlink, so
-    // here the fd directory stays listable (r--) but none of its links can be read.
+    // Python fails one readlink. Linux cannot fail a single fd's readlink: it checks only the
+    // directory's search bit, and a symlink's own mode is ignored. So the case "a visible private
+    // client is not charged when a sibling link is unreadable" cannot be built here. Instead the
+    // fd directory stays listable (r--) but none of its links can be read.
     let tmp = tempfile::tempdir().unwrap();
     let (c, p) = scan_setup(tmp.path());
     let key = c.key;
@@ -551,8 +600,8 @@ fn test_unreadable_fd_after_listing_is_incomplete() {
         let _locked = Restore::chmod(p.join("100").join("fd"), 0o400);
         counters.sample().0.remove(&key).unwrap()
     };
-    // A client behind an unreadable link might be shared: nothing is charged.
-    assert!(procs.get(&100).is_none_or(|g| g.shown_vram().is_none()));
+    // No link could be read, so no client is visible and the process has no row to charge.
+    assert!(!procs.contains_key(&100));
     assert!(
         counters
             .status()

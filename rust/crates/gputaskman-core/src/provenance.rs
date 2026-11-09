@@ -53,6 +53,8 @@ pub enum Reason {
     NoBaseline,
     TornCounter,
     V1Unknown,
+    /// The backend offers this counter but could not read it (an amdgpu sysfs file).
+    Unreadable,
 }
 
 impl Reason {
@@ -73,6 +75,7 @@ impl Reason {
             Reason::NoBaseline => "no_baseline",
             Reason::TornCounter => "torn_counter",
             Reason::V1Unknown => "v1_unknown",
+            Reason::Unreadable => "unreadable",
         }
     }
 

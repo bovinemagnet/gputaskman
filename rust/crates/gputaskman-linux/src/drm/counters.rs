@@ -148,7 +148,7 @@ impl DrmCounters {
     fn adapters(&self) -> BTreeMap<u64, AdapterGpu> {
         let used = |path: PathBuf| match read_int(&path, 10).and_then(|v| u64::try_from(v).ok()) {
             Some(v) => Bytes::measured(v),
-            None => Bytes::unavailable(Reason::NotOnBackend), // unknown, not 0
+            None => Bytes::unavailable(Reason::Unreadable), // unknown, not 0
         };
         self.cards
             .iter()
