@@ -33,6 +33,12 @@ impl DrmBackend {
             selected: None,
         }
     }
+
+    /// Drops cards whose adapter key another backend (NVML) already reports.
+    pub fn without_keys(mut self, keys: &[u64]) -> Self {
+        self.cards.retain(|c| !keys.contains(&c.key));
+        self
+    }
 }
 
 impl GpuBackend for DrmBackend {
