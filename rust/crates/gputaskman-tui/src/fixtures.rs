@@ -137,3 +137,30 @@ pub fn gguf(arch: &str, name: &str) -> GgufInfo {
         error: None,
     }
 }
+
+use ratatui::style::Style;
+use ratatui::text::Line;
+
+/// The lines' text, one line per row.
+pub fn plain(lines: &[Line<'_>]) -> String {
+    lines
+        .iter()
+        .map(|l| {
+            l.spans
+                .iter()
+                .map(|s| s.content.as_ref())
+                .collect::<String>()
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// The style of the first span containing `needle`, on top of its line's style.
+pub fn style_of(lines: &[Line<'_>], needle: &str) -> Option<Style> {
+    lines.iter().find_map(|l| {
+        l.spans
+            .iter()
+            .find(|s| s.content.contains(needle))
+            .map(|s| l.style.patch(s.style))
+    })
+}

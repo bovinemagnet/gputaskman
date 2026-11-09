@@ -6,4 +6,5 @@ pub mod fixtures;
 pub mod format;
 pub mod history;
 pub mod rows;
+pub mod view;
 pub mod widgets;
