@@ -172,6 +172,8 @@ pub struct Snapshot {
     pub adapter: Option<Adapter>,
     pub adapters: Vec<Adapter>,
     pub device: Option<DeviceTelemetry>,
+    /// Why device telemetry could not be read; `None` when it was.
+    pub device_status: Option<Reason>,
     pub driver: Option<String>,
     pub cuda: Option<String>,
     pub vram_total: Bytes,
@@ -257,7 +259,7 @@ impl Collector {
             .enumerate()
             .flat_map(|(i, b)| b.adapters().into_iter().map(move |a| (a, i)))
             .collect();
-        let adapters = list_adapters(&deps.backends);
+        let adapters = ordered_adapters(owned.iter().map(|(a, _)| a.clone()).collect());
         let adapter = select_adapter(&adapters, gpu_index)?;
         let owner = adapter
             .as_ref()
@@ -309,6 +311,7 @@ impl Collector {
             adapter: self.adapter.clone(),
             adapters: self.adapters.clone(),
             device: None,
+            device_status: None,
             driver: None,
             cuda: None,
             vram_total: Bytes::unavailable(Reason::NotOnBackend),
@@ -324,17 +327,24 @@ impl Collector {
             return snap;
         };
         let sample = backend.sample();
-        let device = backend.device(self.gpu_index).ok();
+        let (device, device_status) = match backend.device(self.gpu_index) {
+            Ok(d) => (Some(d), None),
+            Err(reason) => (None, Some(reason)),
+        };
         let total = device
             .as_ref()
             .and_then(|d| d.mem_total)
             .filter(|t| *t > 0)
             .or(Some(adapter.dedicated_vram).filter(|t| *t > 0));
         snap.vram_total = total.map_or(Bytes::unavailable(Reason::NotOnBackend), Bytes::measured);
-        snap.driver = backend.driver();
-        snap.cuda = backend.cuda();
+        // Versions belong to the telemetry that was read; without it the header shows none.
+        if device.is_some() {
+            snap.driver = backend.driver();
+            snap.cuda = backend.cuda();
+        }
         snap.backend = Some(backend.kind());
         snap.device = device;
+        snap.device_status = device_status;
         snap.vram_used = sample.adapter.vram_used;
         snap.shared_used = sample.adapter.shared_used;
         snap.process_status = sample.status.clone();
@@ -347,8 +357,9 @@ impl Collector {
             .filter(|(_, g)| g.is_live())
             .map(|(pid, g)| (*pid, g))
             .collect();
-        // Largest first; rows whose VRAM is unknown go last. The sort is stable.
-        live.sort_by_key(|(_, g)| Reverse(g.shown_vram()));
+        // Largest first, as Python's -(shown_vram or 0): unknown VRAM ties with 0 and the stable
+        // sort keeps pid order.
+        live.sort_by_key(|(_, g)| Reverse(shown(g)));
         for (pid, g) in live {
             let d = self.inspector.get(procs, pid, now).clone();
             snap.procs.push(ProcRow {

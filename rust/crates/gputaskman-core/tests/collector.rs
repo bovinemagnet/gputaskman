@@ -188,13 +188,19 @@ fn rows_are_live_and_sorted_by_shown_vram_with_outside_rows_kept_apart() {
 }
 
 #[test]
-fn unattributed_rows_sort_after_measured_ones() {
+fn unknown_vram_ties_with_measured_zero_and_keeps_pid_order() {
+    // Python sorts by -(shown_vram or 0): unknown counts as 0 and the stable sort keeps pid order.
     let dir = tempfile::tempdir().unwrap();
     let mut sample = BackendSample::default();
     let mut hidden = ProcGpu::measured(0);
     hidden.vram = Bytes::unavailable(Reason::NvmlHidden);
     sample.procs.insert(5, hidden);
-    sample.procs.insert(6, ProcGpu::measured(2 * MIB));
+    let mut busy = ProcGpu::measured(0);
+    busy.engines = Engines::Measured {
+        by_engine: [("compute".to_string(), 50.0)].into_iter().collect(),
+    };
+    sample.procs.insert(6, busy);
+    sample.procs.insert(7, ProcGpu::measured(2 * MIB));
     let nv = FakeBackend::new(BackendKind::Nvml, vec![nv_adapter(1)]).script(vec![sample]);
     let mut c = Collector::new(
         deps(vec![Box::new(nv)], FakeProcs::default(), dir.path()),
@@ -203,7 +209,7 @@ fn unattributed_rows_sort_after_measured_ones() {
     )
     .unwrap();
     let pids: Vec<_> = c.sample().procs.iter().map(|r| r.pid).collect();
-    assert_eq!(pids, vec![6, 5]);
+    assert_eq!(pids, vec![7, 5, 6]);
 }
 
 #[test]
@@ -326,7 +332,11 @@ fn out_of_range_gpu_is_rejected() {
 fn amd_snapshot_does_not_show_cuda_header() {
     let dir = tempfile::tempdir().unwrap();
     let drm = FakeBackend::new(BackendKind::Drm, vec![amd_adapter(2)])
-        .with_driver(Some("kernel 6.17.0".into()), None);
+        .with_driver(Some("kernel 6.17.0".into()), None)
+        .with_device(DeviceTelemetry {
+            source: "AMD sysfs".into(),
+            ..Default::default()
+        });
     let mut c = Collector::new(
         deps(vec![Box::new(drm)], FakeProcs::default(), dir.path()),
         0,
@@ -362,6 +372,97 @@ fn vram_total_prefers_device_telemetry() {
         (snap.driver.as_deref(), snap.cuda.as_deref()),
         (Some("570.86.16"), Some("12.8"))
     );
+}
+
+#[test]
+fn device_failure_is_recorded_and_hides_driver_versions() {
+    let dir = tempfile::tempdir().unwrap();
+    let nv = FakeBackend::new(BackendKind::Nvml, vec![nv_adapter(1)])
+        .with_driver(Some("570.86.16".into()), Some("12.8".into()));
+    let mut c = Collector::new(
+        deps(vec![Box::new(nv)], FakeProcs::default(), dir.path()),
+        0,
+        ScanPolicy::Unbounded,
+    )
+    .unwrap();
+    let snap = c.sample();
+    assert!(snap.device.is_none());
+    assert_eq!(snap.device_status, Some(Reason::NvmlNotLoaded));
+    assert_eq!((snap.driver, snap.cuda), (None, None));
+    assert_eq!(snap.vram_total, Bytes::measured(24 * GIB)); // from the adapter
+}
+
+/// Ollama runners (exe under `/ollama/`) with mapped GGUFs, and a load log at Ollama's log path.
+fn ollama_runners(pids: &[Pid], dir: &Path) -> Snapshot {
+    let paths = Paths::rooted(dir);
+    let log = gputaskman_core::llm::logs::ollama_log_path(&paths);
+    std::fs::create_dir_all(log.parent().unwrap()).unwrap();
+    std::fs::write(
+        &log,
+        "msg=\"model weights\" device=CUDA0 size=\"1.5 GiB\"\n\
+         msg=\"kv cache\" device=CUDA0 size=\"512.0 MiB\"\n",
+    )
+    .unwrap();
+    let model = llm_gguf(dir, "qwen3.gguf");
+    let mut sample = BackendSample::default();
+    let mut procs = FakeProcs::default();
+    for &pid in pids {
+        sample.procs.insert(pid, ProcGpu::measured(3 * GIB));
+        procs = procs
+            .with(
+                pid,
+                ProcBasics {
+                    name: Some("llama-server".into()),
+                    exe: Some("/usr/local/lib/ollama/llama-server".into()),
+                    cmdline: Some(vec!["llama-server".into()]),
+                    start: Some(StartTime {
+                        ticks: 1,
+                        wall: 1.0,
+                    }),
+                },
+            )
+            .maps(pid, mapped(&model));
+    }
+    let nv = FakeBackend::new(BackendKind::Nvml, vec![nv_adapter(1)]).script(vec![sample]);
+    let mut c = Collector::new(
+        deps(vec![Box::new(nv)], procs, dir),
+        0,
+        ScanPolicy::Unbounded,
+    )
+    .unwrap();
+    c.sample()
+}
+
+fn reported(row: &ProcRow) -> usize {
+    let view = row.llm.as_ref().expect("an LLM view");
+    view.segments
+        .iter()
+        .filter(|s| matches!(s.bytes, Bytes::Reported { .. }))
+        .count()
+}
+
+#[test]
+fn a_single_ollama_runner_reads_the_ollama_log() {
+    let dir = tempfile::tempdir().unwrap();
+    let snap = ollama_runners(&[10], dir.path());
+    let log = gputaskman_core::llm::logs::ollama_log_path(&Paths::rooted(dir.path()));
+    let view = snap.procs[0].llm.as_ref().unwrap();
+    assert_eq!(
+        view.log_source.as_deref(),
+        Some(log.to_string_lossy().as_ref())
+    );
+    assert_eq!(reported(&snap.procs[0]), 2);
+}
+
+#[test]
+fn two_ollama_runners_do_not_share_the_ollama_log() {
+    let dir = tempfile::tempdir().unwrap();
+    let snap = ollama_runners(&[10, 11], dir.path());
+    assert_eq!(snap.procs.len(), 2);
+    for row in &snap.procs {
+        assert_eq!(row.llm.as_ref().unwrap().log_source, None);
+        assert_eq!(reported(row), 0);
+    }
 }
 
 fn three_rows(policy: ScanPolicy, dir: &Path) -> Vec<bool> {
